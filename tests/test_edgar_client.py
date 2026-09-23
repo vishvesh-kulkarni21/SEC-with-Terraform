@@ -19,6 +19,10 @@ class FakeResponse:
     def json(self):
         return self.payload
 
+    @property
+    def text(self):
+        return self.payload
+
 
 class FakeSession:
     def __init__(self, response):
@@ -59,3 +63,11 @@ def test_error_response_is_not_cached(tmp_path):
 def test_user_agent_header_is_set(tmp_path):
     client = EdgarClient("Test User test@example.com", tmp_path)
     assert client.session.headers["User-Agent"] == "Test User test@example.com"
+
+
+def test_get_text_is_cached(tmp_path):
+    client = make_client(tmp_path, FakeResponse("<html>10-K</html>"))
+    url = "https://www.sec.gov/Archives/edgar/data/320193/x/aapl-10k.htm"
+    assert client.get_text(url) == "<html>10-K</html>"
+    assert client.get_text(url) == "<html>10-K</html>"
+    assert client.session.calls == 1

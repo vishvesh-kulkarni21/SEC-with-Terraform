@@ -1,0 +1,19 @@
+{
+  "_doc": "Retrieval check questions. A strategy 'hits' a question if any top-k passage contains the needle (case-insensitive). Needles were verified to exist in the latest 10-K text. Fixed before running any comparison.",
+  "questions": [
+    {"ticker": "AAPL", "type": "numeric", "question": "What were Apple's total net sales in fiscal 2025?", "needle": "416,161"},
+    {"ticker": "AAPL", "type": "numeric", "question": "How much revenue did Apple's Services category generate in fiscal 2025?", "needle": "109,158"},
+    {"ticker": "AAPL", "type": "numeric", "question": "What were Apple's net sales in Greater China in 2025?", "needle": "64,377"},
+    {"ticker": "AAPL", "type": "numeric", "question": "What was Apple's operating income in fiscal 2025?", "needle": "133,050"},
+    {"ticker": "AAPL", "type": "qualitative", "question": "How do tariffs affect Apple's business?", "needle": "tariff"},
+    {"ticker": "MSFT", "type": "numeric", "question": "What was Microsoft's total revenue for fiscal year 2026?", "needle": "331,839"},
+    {"ticker": "MSFT", "type": "numeric", "question": "What was Microsoft's net income in fiscal 2026?", "needle": "133,749"},
+    {"ticker": "MSFT", "type": "numeric", "question": "What was Microsoft's operating income in fiscal 2026?", "needle": "155,237"},
+    {"ticker": "MSFT", "type": "qualitative", "question": "How does Microsoft's relationship with OpenAI affect its results?", "needle": "OpenAI"},
+    {"ticker": "MSFT", "type": "qualitative", "question": "What is driving Microsoft's capital expenditures?", "needle": "capital expenditures"},
+    {"ticker": "JNJ", "type": "numeric", "question": "What were Johnson & Johnson's total sales in 2025?", "needle": "94,193"},
+    {"ticker": "JNJ", "type": "numeric", "question": "What were Johnson & Johnson's net earnings in 2025?", "needle": "26,804"},
+    {"ticker": "JNJ", "type": "qualitative", "question": "What talc litigation risks does Johnson & Johnson face?", "needle": "talc"},
+    {"ticker": "JNJ", "type": "qualitative", "question": "How did STELARA sales change due to biosimilar competition?", "needle": "STELARA"}
+  ]
+}

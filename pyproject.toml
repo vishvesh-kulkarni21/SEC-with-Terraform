@@ -5,6 +5,10 @@ description = "Multi-agent equity research from SEC filings, with every number v
 requires-python = ">=3.12"
 dependencies = [
     "requests>=2.32",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+    "numpy>=2.0",
+    "google-genai>=1.0",
 ]
 
 [project.optional-dependencies]

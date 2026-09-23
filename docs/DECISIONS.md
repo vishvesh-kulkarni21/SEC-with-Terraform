@@ -69,3 +69,28 @@ Each entry: what was chosen, what else was considered, and the one-line reason t
 
 ### D14. Per-share figures are excluded from the evaluation
 - **Why:** per-share figures shift across stock splits (Apple split 4:1 in 2020). EPS and share counts are extracted and usable, but the eval scores only company-level figures. That avoids a whole class of false "errors".
+
+## Phase 3: Retrieval
+
+### D15. Parse 10-K HTML into text and table blocks, each tagged with its Item
+- **Chose:** BeautifulSoup + lxml. Hidden inline-XBRL content (`ix:header`, `display:none`) is dropped. Tables are rendered row by row as `cell | cell`, with SEC's split cells (`$` | `1,234`, `(321` | `)`) glued back together. The section is the most recent "Item N." heading.
+- **Why:** a naive `get_text()` flattens tables into an unreadable stream of numbers, which is the exact failure the table-aware chunker exists to fix. The parser has to preserve table structure before any chunker can use it.
+
+### D16. The three chunkers differ only in *where* they cut, not in chunk size
+- **fixed:** a 350-word window with 50-word overlap over the whole document. The baseline.
+- **section:** the same windows, restarted at each Item boundary. Tables can still be split.
+- **table:** Item boundaries, whole paragraphs packed up to 350 words, and each table as its own chunk with its **caption** (the short text just above it, e.g. "(dollars in millions)"). Tables over 1,200 words are split between rows with the header row repeated.
+- **Why:** holding size constant makes the comparison a controlled experiment. The caption matters because units and the statement name live *outside* the `<table>`, and without them a number's scale is ambiguous. That's the "wrong scale or unit" error class.
+- **Size in words, not tokens:** no tokenizer dependency. At roughly 1.3 tokens per word, 350 words is about 450 tokens.
+
+### D17. Embeddings: Gemini `gemini-embedding-001`, 768 dimensions, behind an `Embedder` protocol
+- **Alternatives:** BM25 (keyword), or a local sentence-transformers model.
+- **Why:** semantic retrieval stays on the same provider stack as the agents. The `Embedder` protocol keeps agent and retrieval code free of any SDK import (design rule 6). Document and query embeddings use different task types (`RETRIEVAL_DOCUMENT` vs `RETRIEVAL_QUERY`). Vectors are re-normalised because truncated Gemini embeddings aren't unit length.
+- **One client, two backends:** the google-genai SDK reaches AI Studio (API key, local development) or Vertex AI (service account, Cloud Run) with a config change only.
+
+### D18. No vector database: brute-force numpy cosine search, persisted to `.cache/indexes/`
+- **Why:** one 10-K yields a few hundred chunks, so exact search takes microseconds. A vector DB would add a dependency and infrastructure for no gain at this size. Each 10-K is embedded once and cached, which also matters for free-tier rate limits.
+
+### D19. Retrieval questions use "needles" to measure retrieval precision
+- **Chose:** each question in `eval/retrieval_questions.json` has a needle string (e.g. `"416,161"`) that was verified to exist in the 10-K. A strategy scores a hit when any top-k passage contains it.
+- **Why:** it's a cheap, objective retrieval-precision metric that needs no LLM judge. Numeric needles test exactly what the project cares about: did the chunk that carries the figure get retrieved?

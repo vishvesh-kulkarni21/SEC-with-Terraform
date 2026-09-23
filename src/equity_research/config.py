@@ -31,6 +31,12 @@ def _load_dotenv(path: Path) -> None:
 class Settings:
     sec_user_agent: str
     cache_dir: Path
+    # Model access. Exact model IDs are pinned here so eval runs are comparable.
+    gemini_api_key: str | None = None
+    vertex_project: str | None = None  # set on Cloud Run to use Vertex AI instead of AI Studio
+    vertex_location: str = "us-central1"
+    embedding_model: str = "gemini-embedding-001"
+    chat_model: str = "gemini-2.5-flash"
 
 
 def load_settings(env_file: Path | None = None) -> Settings:
@@ -47,4 +53,12 @@ def load_settings(env_file: Path | None = None) -> Settings:
     if not cache_dir.is_absolute():
         cache_dir = PROJECT_ROOT / cache_dir
 
-    return Settings(sec_user_agent=user_agent, cache_dir=cache_dir)
+    return Settings(
+        sec_user_agent=user_agent,
+        cache_dir=cache_dir,
+        gemini_api_key=os.environ.get("GEMINI_API_KEY") or None,
+        vertex_project=os.environ.get("VERTEX_PROJECT") or None,
+        vertex_location=os.environ.get("VERTEX_LOCATION", "us-central1"),
+        embedding_model=os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001"),
+        chat_model=os.environ.get("CHAT_MODEL", "gemini-2.5-flash"),
+    )
