@@ -78,6 +78,37 @@ def test_figure_from_passage_must_appear_in_it(ledger):
     assert [i.code for i in check_claim(bad, ledger)] == ["not_in_passage"]
 
 
+def _passage_ledger(text: str) -> EvidenceLedger:
+    led = EvidenceLedger()
+    led.add_passage(Passage(Chunk("fixed-0001", "fixed", text, "Item 7", "fixed"),
+                            0.9, "JNJ", "accn", "2025-12-28", "url"))
+    return led
+
+
+def test_passage_figure_after_a_comma_is_found():
+    # Real JNJ 10-K text; stripping spaces used to read "2025,14.7" as one number.
+    led = _passage_ledger("of 2025 sales. In 2025, $14.7 billion was invested in research and development")
+    c = Claim("JNJ invested $14.7 billion in R&D in 2025.", [Figure("$14.7 billion", "P1")], ["P1"])
+    assert check_claim(c, led) == []
+
+
+def test_percent_figure_matches_table_cell_without_percent_sign():
+    # Real JNJ segment table: "%" appears only on the column's first row.
+    led = _passage_ledger("Oncology U.S. | $ 13,659 | 10,854 | 8,462 | 25.8% | 28.3 "
+                          "Worldwide | 25,380 | 20,781 | 17,661 | 22.1 | 17.7")
+    ok = Claim("Oncology sales grew 22.1% in 2025.", [Figure("22.1%", "P1")], ["P1"])
+    bad = Claim("Oncology sales grew 22.7% in 2025.", [Figure("22.7%", "P1")], ["P1"])
+    assert check_claim(ok, led) == []
+    assert [i.code for i in check_claim(bad, led)] == ["not_in_passage"]
+
+
+def test_passage_number_must_not_be_part_of_a_longer_number():
+    led = _passage_ledger("Revenue was $25,380 million and margin 122.1% in 2025.")
+    for display in ("$380 million", "$25 million", "22.1%"):
+        c = Claim(f"A figure of {display} in 2025.", [Figure(display, "P1")], ["P1"])
+        assert [i.code for i in check_claim(c, led)] == ["not_in_passage"], display
+
+
 @pytest.mark.parametrize("kind", ["perturb", "scale", "period"])
 def test_every_planted_error_kind_is_caught(ledger, kind):
     claims = [Claim("Revenue reached $416,161 million in fiscal 2025.", [Figure("$416,161 million", "F1")])]

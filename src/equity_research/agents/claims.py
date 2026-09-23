@@ -182,8 +182,12 @@ def _check_against_passage(fig: Figure, ev: Evidence) -> list[Issue]:
         return [Issue("unparseable", f"cannot read a number in {fig.display!r}")]
     core = re.sub(r"[()$\s-]", "", m.group("num"))
     unit = (m.group("unit") or "").lower()
-    passage = _normalise(ev.text or "")
-    pattern = re.escape(core) + (r"\)?%" if unit in ("%", "percent") else "")
-    if not re.search(rf"(?<![\d.,]){pattern}(?![\d])", passage):
+    # Keep word boundaries: stripping all whitespace turns "In 2025, $14.7 billion" into
+    # "2025,14.7", which reads as one thousands-separated number.
+    passage = " ".join(re.sub(r"\$", " ", ev.text or "").split()).lower()
+    # Filing tables print "%" only on a column's first row ("25.8% | ... | 22.1 | 17.7"),
+    # so a percent figure matches the bare number too.
+    pattern = re.escape(core) + (r"(?:\s*\)?\s*%)?" if unit in ("%", "percent") else "")
+    if not re.search(rf"(?<![\d.])(?<!\d,){pattern}(?![\d]|[.,]\d)", passage):
         return [Issue("not_in_passage", f"{fig.display} not found in [{ev.evidence_id}] ({ev.source})")]
     return []

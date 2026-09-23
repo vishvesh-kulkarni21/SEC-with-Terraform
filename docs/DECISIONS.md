@@ -235,3 +235,18 @@ Each entry: what was chosen, what else was considered, and the one-line reason t
   2. `unverified_numbers`: every `/research` answer is scanned deterministically, and any number that matches no evidence is returned in the response and logged at WARNING.
 - **Verified live:** the same question now cites "+4.16 percentage points [C3]" with no unverified numbers.
 - **Subtlety the tests caught:** subtracting *rounded* displays (26.92 − 23.97 = 2.95) differs from the true difference (2.945, which displays as 2.94). That's one more reason the model must never do the arithmetic.
+
+## After the build
+
+### D48. Debate reports are PDFs
+- **Chose:** `debate_cli` writes `runs/<TICKER>_<conversation_id>.pdf` (reportlab) instead of a markdown file. The PDF has the run's metadata, both cases with evidence ids, the full critic log (every rejected claim with its reason, and planted errors marked CAUGHT/MISSED), and a Sources table that resolves every cited id to its XBRL tag, accession number and period, or to a passage excerpt.
+- **Alternatives:** markdown to HTML to PDF (needs a markdown parser plus a browser engine, e.g. WeasyPrint with native libraries on Windows), or fpdf2 (lighter, but weaker at tables that wrap and span pages).
+- **Why:** reportlab is pure Python, and its flowable tables span pages cleanly. The renderer only lays out numbers the pipeline already produced and formats no new ones (rule 1).
+- **Also:** the CLI's default chunker changed from `table` to `fixed`, the lowest-error chunker in Phase 6 (D43). The API default is unchanged until the next deploy.
+
+### D49. Found in live test runs: the passage check rejected numbers that were really there
+- **Observed (JNJ):** the critic removed claims citing "$14.7 billion" and "22.1%", and both appear in the cited 10-K passages.
+- **Cause 1:** the check stripped *all* whitespace, so "In 2025, $14.7 billion" became "2025,14.7", which looks like a single thousands-separated number.
+- **Cause 2:** filing tables print "%" only on the first row of a column ("25.8% | ... | 22.1 | 17.7"), and the check required "22.1%".
+- **Fix:** keep word boundaries, and let a percent figure match the bare number. The boundary rules still stop "380" from matching inside "25,380". Regression tests use the real JNJ text.
+- **Effect on Phase 6:** numeric error rates don't change, because they're scored against XBRL (`scoring.classify`). Two reported metrics did use this check (`runner.py` sets `critic_issues`): the unsupported-claim rate, and the critic's catch rate on natural errors. Both came from the old, stricter check. Under the new one, the unsupported rate can only go down. The natural catch rate may also go down, because a wrong-row number can now match a bare table cell. Those metrics weren't recomputed. The report's point that natural catch rates are low only gets stronger.

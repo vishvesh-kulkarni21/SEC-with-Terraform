@@ -60,10 +60,11 @@ The full tables, the error taxonomy, the model comparison and the critic catch r
 ```bash
 python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"   # Windows; use .venv/bin on macOS/Linux
 cp .env.example .env        # set SEC_USER_AGENT; VERTEX_PROJECT (gcloud ADC) or GEMINI_API_KEY
-pytest                      # 94 tests, no network needed except the integration tests (cached)
+pytest                      # 99 tests, no network needed except the integration tests (cached)
 
 python -m equity_research.agents.research_cli AAPL "How did Apple's net margin change in fiscal 2025?"
 python -m equity_research.agents.debate_cli MSFT --plant scale      # plant a wrong number; watch the critic
+                                                                    # → PDF report in runs/<TICKER>_<conversation_id>.pdf
 python -m equity_research.retrieval.inspect_cli AAPL "Greater China net sales 2025"   # compare chunkers
 
 python eval/run_eval.py stage1          # chunker comparison (resumable)
@@ -100,5 +101,6 @@ src/equity_research/
   api.py       FastAPI service for Cloud Run
 eval/          frozen company set and config, run_eval.py, results
 infra/         Terraform
-docs/          DECISIONS.md (every design decision), REPORT.md (findings)
+docs/          DECISIONS.md (every design decision), REPORT.md (findings),
+               sample_reports/ (PDF debate reports from live runs)
 ```
