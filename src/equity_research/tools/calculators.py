@@ -107,6 +107,27 @@ def cagr(first: Fact, last: Fact) -> Calculation:
     )
 
 
+def change(later: "Fact | Calculation", earlier: "Fact | Calculation") -> Calculation:
+    """Difference between two values of the same measure in different fiscal years.
+    For ratios the result is in percentage points (unit "pp"), never a ratio of ratios."""
+    name_l = later.metric if isinstance(later, Fact) else later.name
+    name_e = earlier.metric if isinstance(earlier, Fact) else earlier.name
+    if name_l != name_e:
+        raise CalculationError(f"Cannot compare {name_l} with {name_e}")
+    _require_unit(earlier, later.unit)
+    if later.fiscal_year is None or earlier.fiscal_year is None or later.fiscal_year <= earlier.fiscal_year:
+        raise CalculationError("change needs the later fiscal year first")
+    unit = "pp" if later.unit == "ratio" else later.unit
+    return Calculation(
+        name=f"{name_l}_change",
+        value=later.value - earlier.value,
+        unit=unit,
+        formula=f"{name_l} FY{later.fiscal_year} - FY{earlier.fiscal_year}",
+        inputs=(later, earlier),
+        fiscal_year=later.fiscal_year,
+    )
+
+
 # --- margins ------------------------------------------------------------------
 
 def margin(numerator: Fact, revenue: Fact) -> Calculation:

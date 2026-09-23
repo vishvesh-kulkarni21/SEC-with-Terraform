@@ -64,6 +64,12 @@ TOOL_SPECS = [
                    "terminal_growth": {"type": "number", "description": "e.g. 0.025; must be below discount_rate"},
                    "years": {"type": "integer", "description": "Forecast years, default 5"}},
                   ["ticker", "fiscal_year", "growth_rate", "discount_rate", "terminal_growth"])),
+    ToolSpec("change",
+             "Change between two earlier results for the same measure in different years, e.g. "
+             "net margin FY2026 vs FY2025 gives +4.16 percentage points. Pass their evidence ids.",
+             _obj({"later_id": {"type": "string", "description": "evidence id of the later year, e.g. C1"},
+                   "earlier_id": {"type": "string", "description": "evidence id of the earlier year, e.g. C2"}},
+                  ["later_id", "earlier_id"])),
     ToolSpec("submit_answer",
              "Submit your final answer to a factual question. Call exactly once, when done.",
              _obj({"display": {"type": "string",
@@ -189,6 +195,12 @@ class ResearchTools:
         passages = self.retriever.search(ticker.upper(), query, self.strategy, k=self.k)
         self.retrieved += [p.chunk.text for p in passages]
         return {"passages": [self.ledger.add_passage(p).for_model() for p in passages]}
+
+    def _tool_change(self, later_id, earlier_id):
+        later, earlier = self.ledger.get(later_id), self.ledger.get(earlier_id)
+        if later is None or earlier is None or later.origin is None or earlier.origin is None:
+            raise ValueError("change needs two existing fact or calculation evidence ids")
+        return self._calc_result(later.ticker, calc.change(later.origin, earlier.origin))
 
     def _tool_submit_answer(self, display, evidence_id, fiscal_year):
         self.submitted = {"display": str(display), "evidence_id": str(evidence_id),

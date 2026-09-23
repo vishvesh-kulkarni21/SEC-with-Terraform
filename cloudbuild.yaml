@@ -1,0 +1,13 @@
+# Build and push the image as the dedicated build service account (see infra/main.tf).
+#   gcloud builds submit --config cloudbuild.yaml --substitutions _TAG=$(git rev-parse --short HEAD) \
+#     --service-account projects/PROJECT/serviceAccounts/equity-research-build@PROJECT.iam.gserviceaccount.com
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_IMAGE}:${_TAG}", "."]
+images: ["${_IMAGE}:${_TAG}"]
+substitutions:
+  _IMAGE: us-central1-docker.pkg.dev/${PROJECT_ID}/agent-images/equity-research
+  _TAG: latest
+options:
+  dynamicSubstitutions: true  # lets _IMAGE use ${PROJECT_ID}
+  logging: CLOUD_LOGGING_ONLY  # required with a user-specified build service account

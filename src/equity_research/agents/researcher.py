@@ -7,6 +7,7 @@ loop executes every call so each one is traced.
 """
 
 import json
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -19,7 +20,7 @@ RESEARCHER_PROMPT = """You are an equity research analyst. You answer questions 
 
 Rules:
 1. Never do arithmetic yourself. Every figure, growth rate, margin, ratio or valuation must come from a tool result. If you need a number no tool gives you, say it is not available.
-2. Quote numbers exactly as the tool's "display" field shows them, and cite the evidence_id in square brackets right after, e.g. "revenue was $391,035 million [F1]".
+2. Quote numbers exactly as the tool's "display" field shows them, and cite the evidence_id in square brackets right after, e.g. "revenue was $391,035 million [F1]". For a change between years (e.g. a margin up X percentage points), call the change tool; never subtract yourself.
 3. Qualitative statements from the 10-K must cite the passage id, e.g. [P2].
 4. Reported figures come from get_fact and the calculators. Use search_filing for context and explanations.
 5. Be precise about fiscal years. Call list_metrics first to learn which fiscal years exist.
@@ -39,6 +40,7 @@ class AgentRun:
     seconds: float = 0.0
     model_id: str = ""
     stopped_reason: str = "answered"  # or "max_steps"
+    unverified_numbers: list[str] = field(default_factory=list)  # in the answer, but in no evidence
 
 
 def run_agent(model: ChatModel, tools: ResearchTools, system: str, task: str,
@@ -91,7 +93,24 @@ def run_agent(model: ChatModel, tools: ResearchTools, system: str, task: str,
 def research(model: ChatModel, tools: ResearchTools, ticker: str, question: str,
              max_steps: int = 12) -> AgentRun:
     task = f"Company: {ticker.upper()}\nQuestion: {question}"
-    return run_agent(model, tools, RESEARCHER_PROMPT, task, "researcher", max_steps)
+    run = run_agent(model, tools, RESEARCHER_PROMPT, task, "researcher", max_steps)
+    run.unverified_numbers = unverified_numbers(run.answer, tools.ledger)
+    if run.unverified_numbers:
+        log_event("unverified_numbers", severity="WARNING", agent="researcher", numbers=run.unverified_numbers)
+    return run
+
+
+def unverified_numbers(text: str, ledger: EvidenceLedger) -> list[str]:
+    """Numbers in the answer that match no evidence display or passage: the model
+    produced them itself (arithmetic, rounding, or invention), which design rule 1 forbids."""
+    from equity_research.agents.claims import numbers_in_text  # local: avoids an import cycle
+
+    def norm(s: str) -> str:
+        return re.sub(r"[\s$+]", "", s).lower()
+
+    known = [norm(e.display) for e in ledger.items.values()] + \
+            [norm(e.text) for e in ledger.items.values() if e.text]
+    return [n for n in numbers_in_text(text) if not any(norm(n) in k for k in known)]
 
 
 def _summarise(result: dict) -> str:

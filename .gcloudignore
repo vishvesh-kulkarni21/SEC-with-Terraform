@@ -1,0 +1,13 @@
+# Files uploaded to Cloud Build. Written explicitly (not derived from .gitignore)
+# because the image needs .cache, while secrets and local state must never leave.
+.env
+.venv/
+.git/
+runs/
+eval/
+tests/
+infra/
+docs/
+**/__pycache__/
+*.egg-info/
+.pytest_cache/

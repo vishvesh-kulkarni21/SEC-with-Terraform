@@ -56,7 +56,7 @@ def questions_for(ctx, cfg, tickers, limit):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("stage", choices=["stage1", "stage2", "grid", "debate", "report", "questions"])
+    p.add_argument("stage", choices=["stage1", "stage2", "grid", "debate", "report", "questions", "rescore"])
     p.add_argument("--strategy", choices=STRATEGIES, help="chunker for stage2/debate (best from stage1)")
     p.add_argument("--limit", type=int, help="only the first N questions (or companies for debate)")
     p.add_argument("--repeats", type=int, help="override repeats")
@@ -68,6 +68,9 @@ def main():
 
     if a.stage == "report":
         write_report(sfx)
+        return
+    if a.stage == "rescore":
+        rescore(cfg, tickers, sfx)
         return
     if a.stage in ("stage2", "debate") and not a.strategy:
         p.error(f"{a.stage} needs --strategy (the best chunker from stage1)")
@@ -110,6 +113,60 @@ def main():
     print(f"{len(qs)} questions x {len(configs)} configs = {len(qs) * len(configs)} runs "
           f"({len(results.done)} already done)", flush=True)
     run_qa_grid(ctx, qs, configs, results, workers=a.workers)
+
+
+def rescore(cfg, tickers, sfx):
+    """Re-apply the current scorer to saved QA rows without new model calls.
+
+    Retrieved passages are rebuilt from each run's trace (search results list chunk ids,
+    whose text is in the saved index). The original outcome is kept as outcome_v1.
+    """
+    import re
+
+    from equity_research.evaluation.scoring import ERROR_CLASSES, classify
+
+    settings = load_settings()
+    client = EdgarClient(settings.sec_user_agent, settings.cache_dir)
+    fins, chunk_text = {}, {}
+    index_dir = settings.cache_dir / "indexes"
+    for path in index_dir.glob("*.json"):
+        ticker, rest = path.stem.split("-", 1)
+        accn = "-".join(rest.split("-")[:3])
+        for c in json.loads(path.read_text(encoding="utf-8")):
+            chunk_text[(ticker, accn, c["chunk_id"])] = c["text"]
+    source_re = re.compile(r"^(\S+) 10-K accn (\S+) .*, (\S+)$")
+
+    for name in ("stage1", "stage2", "grid"):
+        path = RESULTS / f"{name}{sfx}.jsonl"
+        if not path.exists():
+            continue
+        rows, changed = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines()], 0
+        for r in rows:
+            if r.get("exception") or r.get("kind") != "qa":
+                continue
+            passages = []
+            trace = RESULTS / "traces" / f"{r['conversation_id']}.jsonl"
+            if trace.exists():
+                for line in trace.read_text(encoding="utf-8").splitlines():
+                    ev = json.loads(line)
+                    if ev.get("event") == "tool_call" and ev.get("tool") == "search_filing":
+                        for hit in json.loads(ev.get("result") or "[]"):
+                            m = source_re.match(hit["source"])
+                            if m and (m.group(1), m.group(2), m.group(3)) in chunk_text:
+                                passages.append(chunk_text[(m.group(1), m.group(2), m.group(3))])
+            if r["ticker"] not in fins:
+                fins[r["ticker"]] = CompanyFinancials.load(client, r["ticker"])
+            fin = fins[r["ticker"]]
+            q = next(q for q in build_questions(fin, cfg["question_metrics"], cfg["years_back"]) if q.qid == r["qid"])
+            outcome = classify(r.get("answer") or "", q, fin, passages)
+            r.setdefault("outcome_v1", r["outcome"])
+            if outcome != r["outcome"]:
+                changed += 1
+            r["outcome"] = outcome
+            r["correct"] = outcome == "correct"
+            r["is_error"] = outcome in ERROR_CLASSES or outcome == "unparseable"
+        path.write_text("\n".join(json.dumps(r, default=str) for r in rows) + "\n", encoding="utf-8")
+        print(f"{name}: rescored {len(rows)} rows, {changed} outcomes changed")
 
 
 def write_report(sfx):

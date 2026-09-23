@@ -20,6 +20,8 @@ def format_value(value: float, unit: str) -> str:
         return f"${value / 1e6:,.0f} million" if abs(value) >= 1e6 else f"${value:,.0f}"
     if unit == "ratio":
         return f"{value * 100:.2f}%"
+    if unit == "pp":
+        return f"{value * 100:+.2f} percentage points"
     if unit == "USD/shares":
         return f"${value:,.2f} per share"
     if unit == "shares":
@@ -40,6 +42,7 @@ class Evidence:
     fiscal_year: int | None = None
     facts: list[Fact] = field(default_factory=list)  # underlying XBRL facts
     text: str | None = None  # passage text
+    origin: object = None  # the Fact or Calculation itself, for tools that build on it
 
     def for_model(self) -> dict:
         """The view the model sees in a tool result."""
@@ -69,7 +72,7 @@ class EvidenceLedger:
                 return e
         ev = Evidence(self._next_id("F"), "fact", ticker, f"{fact.metric} FY{fact.fiscal_year}",
                       format_value(fact.value, fact.unit), fact.source, fact.value, fact.unit,
-                      fact.fiscal_year, [fact])
+                      fact.fiscal_year, [fact], origin=fact)
         self.items[ev.evidence_id] = ev
         return ev
 
@@ -78,7 +81,7 @@ class EvidenceLedger:
         source = f"{calc.formula}; inputs: " + "; ".join(f.source for f in calc.facts())
         ev = Evidence(self._next_id("C"), "calculation", ticker, label,
                       format_value(calc.value, calc.unit), source, calc.value, calc.unit,
-                      calc.fiscal_year, calc.facts())
+                      calc.fiscal_year, calc.facts(), origin=calc)
         self.items[ev.evidence_id] = ev
         return ev
 

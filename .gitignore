@@ -24,3 +24,9 @@ runs/
 
 # Eval traces are large; raw result rows and tables are committed
 eval/results/traces/
+
+# Terraform local state and provider cache
+infra/.terraform/
+infra/*.tfstate*
+infra/.terraform.lock.hcl.bak
+infra/terraform.tfvars

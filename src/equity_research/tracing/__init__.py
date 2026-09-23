@@ -22,6 +22,7 @@ from typing import Any, Iterator
 _conversation_id: ContextVar[str | None] = ContextVar("conversation_id", default=None)
 _run_file: ContextVar[Path | None] = ContextVar("run_file", default=None)
 _echo: ContextVar[bool] = ContextVar("echo", default=True)
+_extra: ContextVar[dict] = ContextVar("extra", default={})
 
 
 def new_conversation_id() -> str:
@@ -34,20 +35,26 @@ def current_conversation_id() -> str | None:
 
 @contextmanager
 def conversation(conversation_id: str | None = None, run_dir: Path | None = None,
-                 echo: bool = True) -> Iterator[str]:
-    """Bind a conversation id (and optional per-run log file) for everything inside."""
+                 echo: bool = True, extra: dict | None = None) -> Iterator[str]:
+    """Bind a conversation id (and optional per-run log file) for everything inside.
+
+    extra: fields added to every event, e.g. Cloud Logging's trace field so all of a
+    request's log lines group under its Cloud Trace span.
+    """
     cid = conversation_id or new_conversation_id()
     run_file = None
     if run_dir is not None:
         run_dir.mkdir(parents=True, exist_ok=True)
         run_file = run_dir / f"{cid}.jsonl"
-    tokens = (_conversation_id.set(cid), _run_file.set(run_file), _echo.set(echo))
+    tokens = (_conversation_id.set(cid), _run_file.set(run_file), _echo.set(echo),
+              _extra.set(dict(extra or {})))
     try:
         yield cid
     finally:
         _conversation_id.reset(tokens[0])
         _run_file.reset(tokens[1])
         _echo.reset(tokens[2])
+        _extra.reset(tokens[3])
 
 
 def log_event(event: str, severity: str = "INFO", **fields: Any) -> dict:
@@ -57,6 +64,7 @@ def log_event(event: str, severity: str = "INFO", **fields: Any) -> dict:
         "message": event,
         "event": event,
         "conversation_id": _conversation_id.get(),
+        **_extra.get(),
         **fields,
     }
     line = json.dumps(record, default=str)

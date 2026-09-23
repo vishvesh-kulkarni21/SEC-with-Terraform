@@ -31,7 +31,7 @@ def qa_table(rows: list[dict], group_by: tuple[str, ...]) -> str:
         if r.get("kind") == "qa" and not r.get("exception"):
             groups[tuple(r[g] for g in group_by)].append(r)
 
-    head = (list(group_by) + ["runs", "accuracy", "numeric error rate (95% CI)", "abstained",
+    head = (list(group_by) + ["runs", "accuracy", "alt. definition", "numeric error rate (95% CI)", "abstained",
                               "unsupported", "critic catch", "retrieval hit", "p50 s", "cost/run",
                               "cost/correct"])
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
@@ -48,6 +48,7 @@ def qa_table(rows: list[dict], group_by: tuple[str, ...]) -> str:
         lines.append("| " + " | ".join([
             *[str(k) for k in key], str(n),
             _pct(correct, n),
+            _pct(sum(r["outcome"] == "alt_definition" for r in g), n),
             f"{_pct(len(errors), len(answered))} ({_ci95(len(errors), len(answered))})",
             _pct(n - len(answered), n),
             _pct(sum(not r["supported"] for r in answered), len(answered)),

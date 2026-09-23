@@ -160,18 +160,19 @@ def _to_fact(metric: str, tag: str, unit: str, raw: dict, period_type: str) -> F
     )
 
 
-def reported_values(companyfacts: dict, metric: str, end: date) -> set[float]:
-    """Every value any 10-K ever reported for this metric and period end (all tags).
+def reported_facts(companyfacts: dict, metric: str, end: date) -> list[Fact]:
+    """Every 10-K copy of this metric for this period end, under any of its tags.
 
-    Used by the error taxonomy: an answer matching an older copy that differs from
-    ground truth is a "stale or restated" error, not a fabrication.
+    Used by the error taxonomy to tell apart an older, since-revised copy (stale or
+    restated) from an alternative definition in the same filing (e.g. equity with or
+    without noncontrolling interest).
     """
     spec = METRICS[metric]
     gaap = companyfacts.get("facts", {}).get("us-gaap", {})
-    values = set()
+    out = []
     for tag in spec.tags:
         for raw in gaap.get(tag, {}).get("units", {}).get(spec.unit, []):
             fact = _to_fact(metric, tag, spec.unit, raw, spec.period_type)
             if fact is not None and fact.end == end:
-                values.add(fact.value)
-    return values
+                out.append(fact)
+    return out

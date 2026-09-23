@@ -78,13 +78,14 @@ class Issue:
 # --- parsing numbers as written ------------------------------------------------
 
 _NUM = r"\(?-?\$?\s?\d[\d,]*(?:\.\d+)?\)?"
-_FIGURE_RE = re.compile(rf"(?P<num>{_NUM})\s*(?P<unit>%|percent|million|billion|thousand|per share)?", re.I)
+_FIGURE_RE = re.compile(
+    rf"(?P<num>[+]?{_NUM})\s*(?P<unit>percentage points?|%|percent|million|billion|thousand|per share)?", re.I)
 _SCALE = {"thousand": 1e3, "million": 1e6, "billion": 1e9}
 # Money, percents, and anything with a thousands separator or decimals count as figures.
 # Bare integers (years, "Item 7", "10-K") do not.
 _TEXT_NUMBER_RE = re.compile(
     r"\(?-?\$\s?\d[\d,]*(?:\.\d+)?\)?(?:\s*(?:million|billion|thousand))?"
-    r"|\(?-?\d[\d,]*(?:\.\d+)?\)?\s*(?:%|percent)"
+    r"|\(?-?\d[\d,]*(?:\.\d+)?\)?\s*(?:%|percentage points?|percent)"
     r"|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b(?:\s*(?:million|billion|thousand))?"
     r"|\b\d+\.\d+\b(?:\s*(?:million|billion|thousand|x))?", re.I)
 _YEAR_RE = re.compile(r"\b(?:FY\s?|fiscal (?:year )?)?((?:19|20)\d{2})\b", re.I)
@@ -103,7 +104,7 @@ def parse_figure(display: str) -> tuple[float, float, str] | None:
     value = float(digits)
     decimals = len(digits.split(".")[1]) if "." in digits else 0
     half_unit = 0.5 * 10 ** -decimals
-    if unit in ("%", "percent"):
+    if unit in ("%", "percent") or unit.startswith("percentage point"):
         value, half_unit, kind = value / 100, half_unit / 100, "ratio"
     elif unit in _SCALE:
         value, half_unit, kind = value * _SCALE[unit], half_unit * _SCALE[unit], "USD"

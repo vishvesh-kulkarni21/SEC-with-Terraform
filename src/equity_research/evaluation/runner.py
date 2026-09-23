@@ -125,7 +125,7 @@ def run_qa(ctx: EvalContext, q: Question, cfg: QAConfig) -> dict:
                         f"Company: {q.ticker}\nQuestion: {q.text}", "qa", max_steps=8)
     answer = tools.submitted or {}
     display, eid = answer.get("display"), answer.get("evidence_id", "")
-    outcome = classify(display or "", q, ctx.fin(q.ticker))
+    outcome = classify(display or "", q, ctx.fin(q.ticker), tools.retrieved)
 
     # What the critic's deterministic layer would say about this answer as a claim.
     critic_issues = []
@@ -141,6 +141,7 @@ def run_qa(ctx: EvalContext, q: Question, cfg: QAConfig) -> dict:
         "supported": outcome != "abstained" and not critic_issues,
         "critic_issues": critic_issues,
         "retrieval_hit": retrieval_hit(q, tools.retrieved) if text_mode else None,
+        "retrieved_sources": [e.source for e in tools.ledger.items.values() if e.kind == "passage"],
         "searches": sum(1 for c in run.tool_calls if c["tool"] == "search_filing"),
         "steps": run.steps, "stopped_reason": run.stopped_reason, "seconds": run.seconds,
         "input_tokens": run.usage.input_tokens, "output_tokens": run.usage.output_tokens,

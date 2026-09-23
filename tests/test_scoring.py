@@ -19,6 +19,8 @@ def fin():
             dur(78_740e6, 2021, "2024-02-16", "restated"),  # restated (ground truth)
             dur(88_821e6, 2024), dur(94_193e6, 2025)]}},
         "NetIncomeLoss": {"units": {"USD": [dur(14_066e6, 2024), dur(26_804e6, 2025)]}},
+        # same filing, second accepted tag with a different value (e.g. incl. other income)
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {"USD": [dur(92_000e6, 2025)]}},
     }}}
     return CompanyFinancials("JNJ", cf)
 
@@ -40,6 +42,16 @@ def q_rev_2025(fin):
 ])
 def test_taxonomy(fin, q_rev_2025, answer, expected):
     assert classify(answer, q_rev_2025, fin) == expected
+
+
+def test_alternative_definition_in_same_filing_is_not_an_error(fin, q_rev_2025):
+    assert classify("$92,000 million", q_rev_2025, fin) == "alt_definition"
+
+
+def test_real_number_from_wrong_row_is_misread_not_fabricated(fin, q_rev_2025):
+    passages = ["Innovative Medicine | 60,401 | 56,964"]
+    assert classify("$60,401 million", q_rev_2025, fin, passages) == "wrong_line_item"
+    assert classify("$60,401 million", q_rev_2025, fin, []) == "fabricated"
 
 
 def test_stale_restated(fin):
@@ -64,7 +76,7 @@ def test_report_tables_render():
            "critic_issues": [] if o == "correct" else ["not_in_passage"], "retrieval_hit": True,
            "seconds": 5.0, "cost_usd": 0.01} for o in ("correct", "correct", "wrong_period", "abstained")]
     t = qa_table(qa, ("condition",))
-    assert "| table | 4 | 50.0% | 33.3%" in t
+    assert "| table | 4 | 50.0% | 0.0% | 33.3%" in t
     assert "wrong_period" in taxonomy_table(qa, ("condition",))
     debate = [{"kind": "debate", "plant_kind": "scale", "seconds": 90, "cost_usd": 0.05, "sides": {
         "bull": {"plant_caught": True, "caught_by_code": ["value_mismatch"], "draft_claims": 6,
