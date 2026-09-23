@@ -226,7 +226,7 @@ equity-research-agent/
 Update this as phases complete, so a new session knows where we are.
 
 - [x] Phase 1: Ground truth (2026-09-23; `data/xbrl.py`, tests/test_ground_truth.py)
-- [ ] Phase 2: Deterministic tools
+- [x] Phase 2: Deterministic tools (2026-09-23; `tools/calculators.py`, `data/financials.py`)
 - [ ] Phase 3: Retrieval
 - [ ] Phase 4: One agent
 - [ ] Phase 5: Multi-agent
@@ -234,7 +234,7 @@ Update this as phases complete, so a new session knows where we are.
 - [ ] Phase 7: Deploy
 - [ ] Phase 8: Write-up
 
-**Current phase:** 2 (design decisions are logged in docs/DECISIONS.md)
+**Current phase:** 3 (design decisions are logged in docs/DECISIONS.md)
 **Last decision made:** (2026-09-22) Ground truth = as most recently reported (latest-filed 10-K copy of each period), because agents read the latest 10-K text; older values are caught by the "stale or restated" error class. Annual facts selected by period end date + ~1yr duration, never by `fy`. EDGAR cache never expires unless refresh=True (frozen snapshot → reproducible evals). Revenue tags chosen per period from a priority list (Apple: SalesRevenueNet → Revenues (FY2018) → RevenueFromContractWithCustomerExcludingAssessedTax (ASC 606)).
 **Open questions:**
 - `agent-infra` does not exist yet. GCP account created 2026-09-20; Terraform must be written from scratch in Phase 7. gcloud (SDK 585.0.0) and Terraform (1.16.2) installed 2026-09-21. gcloud and ADC authenticated; project `project-b3a2f493-623c-418f-818` (billing enabled, $20 budget alert). No default region set yet; plan is us-central1.

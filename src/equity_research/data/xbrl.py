@@ -7,7 +7,7 @@ Rules (see docs/DECISIONS.md):
 - Ground truth = as most recently reported: for each period end date, the fact from the
   latest-filed 10-K wins, whichever tag in the metric's list it uses. Tag priority only
   breaks ties between facts in the same filing.
-- Only USD facts are used for monetary metrics; the unit travels with every value.
+- Each metric has one fixed unit (USD, shares, USD/shares); the unit travels with every value.
 """
 
 from dataclasses import dataclass
@@ -16,17 +16,43 @@ from datetime import date
 ANNUAL_FORMS = {"10-K", "10-K/A"}
 MIN_ANNUAL_DAYS, MAX_ANNUAL_DAYS = 350, 380
 
-# Metric name -> (period type, tags in priority order).
-# "duration" facts cover a fiscal year (income / cash flow statement);
-# "instant" facts are balances at the fiscal year end (balance sheet).
-METRICS: dict[str, tuple[str, list[str]]] = {
-    "revenue": ("duration", [
+@dataclass(frozen=True)
+class MetricSpec:
+    period_type: str  # "duration" (income / cash flow statement) or "instant" (balance sheet)
+    unit: str
+    tags: tuple[str, ...]  # priority order; only breaks ties within one filing
+
+
+METRICS: dict[str, MetricSpec] = {
+    # Income statement
+    "revenue": MetricSpec("duration", "USD", (
         "Revenues",
         "RevenueFromContractWithCustomerExcludingAssessedTax",
         "SalesRevenueNet",
         "RevenueFromContractWithCustomerIncludingAssessedTax",
-    ]),
-    "net_income": ("duration", ["NetIncomeLoss"]),
+    )),
+    "gross_profit": MetricSpec("duration", "USD", ("GrossProfit",)),
+    "operating_income": MetricSpec("duration", "USD", ("OperatingIncomeLoss",)),
+    "pretax_income": MetricSpec("duration", "USD", (
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+    )),
+    "net_income": MetricSpec("duration", "USD", ("NetIncomeLoss",)),
+    "eps_diluted": MetricSpec("duration", "USD/shares", ("EarningsPerShareDiluted",)),
+    "diluted_shares": MetricSpec("duration", "shares", ("WeightedAverageNumberOfDilutedSharesOutstanding",)),
+    # Cash flow statement
+    "operating_cash_flow": MetricSpec("duration", "USD", ("NetCashProvidedByUsedInOperatingActivities",)),
+    "capex": MetricSpec("duration", "USD", ("PaymentsToAcquirePropertyPlantAndEquipment",)),
+    # Balance sheet
+    "total_assets": MetricSpec("instant", "USD", ("Assets",)),
+    "total_liabilities": MetricSpec("instant", "USD", ("Liabilities",)),
+    "current_assets": MetricSpec("instant", "USD", ("AssetsCurrent",)),
+    "current_liabilities": MetricSpec("instant", "USD", ("LiabilitiesCurrent",)),
+    "cash": MetricSpec("instant", "USD", ("CashAndCashEquivalentsAtCarryingValue",)),
+    "long_term_debt": MetricSpec("instant", "USD", ("LongTermDebt",)),  # includes current maturities
+    "shareholders_equity": MetricSpec("instant", "USD", (
+        "StockholdersEquity",
+        "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
+    )),
 }
 
 
@@ -63,16 +89,23 @@ def fiscal_year_of(end: date) -> int:
     return end.year - 1 if end.month == 1 and end.day <= 7 else end.year
 
 
-def annual_facts(companyfacts: dict, metric: str, unit: str = "USD") -> dict[int, Fact]:
-    """Return {fiscal_year: Fact} for every fiscal year the company reported this metric."""
-    period_type, tags = METRICS[metric]
+def annual_facts(
+    companyfacts: dict, metric: str, period_ends: set[date] | None = None
+) -> dict[int, Fact]:
+    """Return {fiscal_year: Fact} for every fiscal year the company reported this metric.
+
+    period_ends: if given, keep only facts ending on these dates. Balance-sheet (instant)
+    facts need this: a 10-K also carries balances at dates that are not fiscal year ends.
+    """
+    spec = METRICS[metric]
+    tags, unit = spec.tags, spec.unit
     gaap = companyfacts.get("facts", {}).get("us-gaap", {})
 
     best: dict[date, tuple[tuple, Fact]] = {}  # period end -> (sort key, fact)
     for priority, tag in enumerate(tags):
         for raw in gaap.get(tag, {}).get("units", {}).get(unit, []):
-            fact = _to_fact(metric, tag, unit, raw, period_type)
-            if fact is None:
+            fact = _to_fact(metric, tag, unit, raw, spec.period_type)
+            if fact is None or (period_ends is not None and fact.end not in period_ends):
                 continue
             # Latest filing wins; within one filing, the higher-priority tag wins.
             key = (fact.filed, fact.accn, -priority)
@@ -81,7 +114,7 @@ def annual_facts(companyfacts: dict, metric: str, unit: str = "USD") -> dict[int
                 best[fact.end] = (key, fact)
 
     if not best:
-        raise MissingMetricError(f"No annual {unit} facts for {metric!r} under tags {tags}")
+        raise MissingMetricError(f"No annual {unit} facts for {metric!r} under tags {list(tags)}")
 
     result: dict[int, Fact] = {}
     for _, fact in best.values():
