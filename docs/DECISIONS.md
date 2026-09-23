@@ -94,3 +94,12 @@ Each entry: what was chosen, what else was considered, and the one-line reason t
 ### D19. Retrieval questions use "needles" to measure retrieval precision
 - **Chose:** each question in `eval/retrieval_questions.json` has a needle string (e.g. `"416,161"`) that was verified to exist in the 10-K. A strategy scores a hit when any top-k passage contains it.
 - **Why:** it's a cheap, objective retrieval-precision metric that needs no LLM judge. Numeric needles test exactly what the project cares about: did the chunk that carries the figure get retrieved?
+
+### D20. Model access through Vertex AI, not an AI Studio key
+- **Chose:** Vertex AI on the project's GCP account, authenticated with gcloud ADC locally and a service account on Cloud Run. `VERTEX_PROJECT` in `.env` switches the backend.
+- **Why:** the AI Studio key landed on the paid prepay tier (it was created in a billing-enabled project), which returned 402. Vertex AI uses the GCP free-trial credits, has no daily free-tier cap to slow the eval down, and is the same path production uses. The code didn't change, only config (D17).
+
+### D21. First retrieval check: don't tune on it
+- **Observed (k=3, 14 questions):** fixed 14/14, section 13/14, table 12/14. At k=5 it was 14, 14 and 13.
+- **Why the table chunker missed:** a pure number table embeds weakly. The Greater China table chunk was intact and captioned but ranked 4th, behind narrative text. Fixed and section windows mix a table with its surrounding explanation, which helps their similarity scores.
+- **Decision:** leave the chunkers as designed. 14 questions is too few to conclude anything, and changing a chunker because of these questions would be tuning on the test set. Phase 6 measures the effect on the agents' actual numeric error rate, which is the metric that matters. If it holds up, "table-preserving chunks retrieve *worse* under pure embedding search" is itself a finding.
