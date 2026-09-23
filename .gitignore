@@ -30,3 +30,6 @@ infra/.terraform/
 infra/*.tfstate*
 infra/.terraform.lock.hcl.bak
 infra/terraform.tfvars
+eval/results/*_smoke.jsonl
+eval/results/*_backup.jsonl
+eval/results/*.log

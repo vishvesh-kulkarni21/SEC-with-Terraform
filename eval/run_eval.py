@@ -62,6 +62,7 @@ def main():
     p.add_argument("--repeats", type=int, help="override repeats")
     p.add_argument("--workers", type=int, default=6)
     p.add_argument("--tag", default="", help="suffix for results files, e.g. smoke")
+    p.add_argument("--companies", nargs="+", help="override the grid company set (exploratory runs only)")
     a = p.parse_args()
     cfg, tickers = load_config()
     sfx = f"_{a.tag}" if a.tag else ""
@@ -80,7 +81,7 @@ def main():
     else:
         model_ids = cfg["stage2"]["models"] if a.stage == "stage2" else cfg["grid"]["models"]
     ctx = make_context(cfg, model_ids)
-    run_tickers = cfg["grid"]["companies"] if a.stage == "grid" else tickers
+    run_tickers = (a.companies or cfg["grid"]["companies"]) if a.stage == "grid" else tickers
 
     if a.stage == "questions":
         for q in questions_for(ctx, cfg, run_tickers, a.limit):
@@ -185,6 +186,11 @@ def write_report(sfx):
                 "### Error taxonomy by model", "", report.taxonomy_table(s2, ("model",)), ""]
     if grid:
         out += ["## Interaction check: chunker x model", "", report.qa_table(grid, ("condition", "model")), ""]
+    exploratory = rows("grid_exploratory")
+    if exploratory:
+        out += ["## Exploratory (post-hoc): chunker x model on KO and CVX", "",
+                "Companies chosen AFTER stage 1 because the table chunker failed there; not pre-registered.", "",
+                report.qa_table(exploratory, ("condition", "model")), ""]
     if debate:
         out += ["## Critic catch rate on planted errors (full pipeline)", "", report.debate_table(debate), ""]
     failed = sum(1 for r in s1 + s2 + grid + debate if r.get("exception"))

@@ -230,13 +230,13 @@ Update this as phases complete, so a new session knows where we are.
 - [x] Phase 3: Retrieval (2026-09-23; `retrieval/`, inspect with `python -m equity_research.retrieval.inspect_cli`)
 - [x] Phase 4: One agent (2026-09-23; `agents/researcher.py`, run with `python -m equity_research.agents.research_cli`)
 - [x] Phase 5: Multi-agent (2026-09-23; `agents/debate.py`, run with `python -m equity_research.agents.debate_cli AAPL --plant perturb`)
-- [ ] Phase 6: Evaluation
-- [ ] Phase 7: Deploy
-- [ ] Phase 8: Write-up
+- [x] Phase 6: Evaluation (2026-09-23; `eval/run_eval.py`, results in `eval/results/RESULTS.md`)
+- [x] Phase 7: Deploy (2026-09-23; `infra/` Terraform, Cloud Run URL https://equity-research-vf3275n3ea-uc.a.run.app (private, IAM invoker vishveshk21@gmail.com), traced in Cloud Logging)
+- [x] Phase 8: Write-up (2026-09-23; `docs/REPORT.md`)
 
-**Current phase:** 6 (design decisions are logged in docs/DECISIONS.md)
-**Last decision made:** (2026-09-23) See docs/DECISIONS.md, the running log (D1–D34 cover Phases 1–5).
+**Current phase:** Build complete. Next: interview prep (walk through docs/DECISIONS.md and the code with explain-back questions).
+**Last decision made:** (2026-09-23) See docs/DECISIONS.md, the running log (D1–D47 cover Phases 1–7).
 **Open questions:**
-- `agent-infra` does not exist yet. GCP account created 2026-09-20; Terraform must be written from scratch in Phase 7. gcloud (SDK 585.0.0) and Terraform (1.16.2) installed 2026-09-21. gcloud and ADC authenticated; project `project-b3a2f493-623c-418f-818` (billing enabled, $20 budget alert). No default region set yet; plan is us-central1.
+- `agent-infra` = `infra/` in this repo (Terraform, local state, gitignored tfvars). Redeploy: Cloud Build with the build SA (see README), then `terraform apply -var image_tag=<sha>`.
 - Gemini is accessed through Vertex AI (VERTEX_PROJECT in .env; aiplatform API enabled 2026-09-23), billed to the $300 GCP credits. The AI Studio key returned 402 (paid prepay tier) and is unused.
 - Phase 1 tickers: AAPL (Sept FY), MSFT (June FY), JNJ (Dec FY), chosen for three different fiscal year-ends and sectors. WMT (Jan FY) is a later stress test.

@@ -194,3 +194,44 @@ Each entry: what was chosen, what else was considered, and the one-line reason t
 ### D41. Repeats and parallelism
 - **Chose:** 3 repeats at temperature 0, 8 worker threads, resumable JSONL rows, and indexes built before threads start.
 - **Why:** temperature 0 still varies run to run, and repeats measure that variance. Building indexes first keeps embedding time out of latency and avoids races.
+
+### D42. Scoring correction after inspecting Stage 1 errors (disclosed, no new model calls)
+- **Found:** reading every error row showed two bugs in the classifier and one ambiguity in the ground truth.
+  1. `stale_restated` compared against every tag's values, so a *different definition in the same filing* was labelled stale. It now counts only copies from **earlier** filings.
+  2. `fabricated` covered numbers the agent had copied from a real filing table, just the wrong row. CLAUDE.md defines fabricated as "no source supports the number", so a figure found in a retrieved passage is now `wrong_line_item` (a misread).
+  3. **Ground-truth ambiguity, a new non-error outcome `alt_definition`:** the answer matches another accepted tag for the same metric in the same filing. Examples: Walmart equity with vs without noncontrolling interest, and Chevron "sales and other operating revenues" ($193,414M) vs XBRL `Revenues` = "total revenues and other income" ($202,792M). The question wording admits both.
+- **Method:** `run_eval.py rescore` rebuilt each run's retrieved passages from its trace, re-applied the scorer and kept `outcome_v1`. The questions, runs and answers are unchanged. Before correction the error rates were 5.3/6.5/7.1%, and after correction they're 0.8/2.7/4.5%.
+- **Lesson:** a single error rate hides most of the story. About half the "errors" were definitional disagreements between the question and the ground truth, not hallucinations. That's why the taxonomy exists.
+
+### D43. Stage 1 finding: table-aware chunking causes systematic look-alike-table errors
+- **Result:** numeric error rates were fixed 0.8% (95% CI 0–3%), section 2.7% (1–5%), table 4.5% (3–8%), and **XBRL tools 0.0% (0–1%)**.
+- **Mechanism (from traces):** a whole table becomes one high-similarity chunk, including tables for *other entities*: Coca-Cola's equity-method investees ("Net income attributable to common shareowners: $9,202M") a Chevron related-entity schedule in Item 14, and Caterpillar's comprehensive-income statement (a near-synonym of net income). The agent reads a row whose label matches the question exactly. Fixed windows mix these tables with the narrative around them ("our equity method investees…"), which lowers their similarity score.
+- **Character of errors:** table-aware errors repeat on 3 of 3 runs (systematic retrieval), while fixed-window errors are 1-of-3 (random misreads).
+- **Caveat:** repeats aren't independent. By distinct question it's fixed 2/90, section 5/90 and table 5/90, so the chunker gap is small and the tools-vs-text gap is the robust result.
+- **Stage 2 chunker:** `fixed`, by the pre-registered rule "the lowest numeric error rate goes to stage 2".
+
+## Phase 7: Deploy
+
+### D44. The "agent-infra" Terraform: private Cloud Run, two least-privilege service accounts, no keys
+- **Runtime SA:** `roles/aiplatform.user` + `roles/logging.logWriter` only. Gemini is reached through Vertex AI with the SA's identity, so there's no API key to store or leak (Secret Manager isn't needed).
+- **Build SA:** Artifact Registry writer, logs writer and object viewer. The Compute Engine default account is avoided because it's broader than a build needs and a new project may not have it; its absence caused the first `PERMISSION_DENIED`.
+- **The service is private:** no `allUsers`. Invokers are listed explicitly and callers need an identity token (verified: unauthenticated gets 403).
+- **Cost guards:** scale to zero, max 2 instances, CPU only allocated during requests. A 300s timeout covers a ~2 min debate.
+- **Two-step bootstrap:** `deploy_service=false` creates the registry and SAs before an image exists, then Cloud Build pushes, then a full apply.
+- **State:** local and gitignored, as are the tfvars. A GCS backend with locking is the next step for a team.
+
+### D45. The image bakes in the data snapshot
+- **Chose:** `.cache` (EDGAR responses + embedding indexes, about 100 MB) is copied into the image. `.gcloudignore` is written explicitly so `.env` can never be uploaded (verified with `gcloud meta list-files-for-upload`).
+- **Why:** fast cold starts, no SEC calls on the request path, and the deployed service answers from the same frozen data the evaluation used.
+
+### D46. End-to-end tracing in Cloud Logging
+- **Chose:** JSON lines on stderr become `jsonPayload`. Each request's `X-Cloud-Trace-Context` is mapped to `logging.googleapis.com/trace` and bound with the conversation ID for the whole run.
+- **Result:** `jsonPayload.conversation_id="…"` returns request → agent_start → each llm_call/tool_call → agent_end, all under one Cloud Trace ID.
+
+### D47. Found in the deployed service: the model subtracted two margins itself
+- **Observed:** "an increase of 4.16 percentage points" had no tool behind it, a design rule 1 violation. `/research` had no critic.
+- **Fixes:**
+  1. A `change` tool, which works in percentage points for ratios.
+  2. `unverified_numbers`: every `/research` answer is scanned deterministically, and any number that matches no evidence is returned in the response and logged at WARNING.
+- **Verified live:** the same question now cites "+4.16 percentage points [C3]" with no unverified numbers.
+- **Subtlety the tests caught:** subtracting *rounded* displays (26.92 − 23.97 = 2.95) differs from the true difference (2.945, which displays as 2.94). That's one more reason the model must never do the arithmetic.
