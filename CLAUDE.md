@@ -228,14 +228,14 @@ Update this as phases complete, so a new session knows where we are.
 - [x] Phase 1: Ground truth (2026-09-23; `data/xbrl.py`, tests/test_ground_truth.py)
 - [x] Phase 2: Deterministic tools (2026-09-23; `tools/calculators.py`, `data/financials.py`)
 - [x] Phase 3: Retrieval (2026-09-23; `retrieval/`, inspect with `python -m equity_research.retrieval.inspect_cli`)
-- [ ] Phase 4: One agent
+- [x] Phase 4: One agent (2026-09-23; `agents/researcher.py`, run with `python -m equity_research.agents.research_cli`)
 - [ ] Phase 5: Multi-agent
 - [ ] Phase 6: Evaluation
 - [ ] Phase 7: Deploy
 - [ ] Phase 8: Write-up
 
-**Current phase:** 4 (design decisions are logged in docs/DECISIONS.md)
-**Last decision made:** (2026-09-23) See docs/DECISIONS.md, the running log (D1–D21 cover Phases 1–3).
+**Current phase:** 5 (design decisions are logged in docs/DECISIONS.md)
+**Last decision made:** (2026-09-23) See docs/DECISIONS.md, the running log (D1–D27 cover Phases 1–4).
 **Open questions:**
 - `agent-infra` does not exist yet. GCP account created 2026-09-20; Terraform must be written from scratch in Phase 7. gcloud (SDK 585.0.0) and Terraform (1.16.2) installed 2026-09-21. gcloud and ADC authenticated; project `project-b3a2f493-623c-418f-818` (billing enabled, $20 budget alert). No default region set yet; plan is us-central1.
 - Gemini is accessed through Vertex AI (VERTEX_PROJECT in .env; aiplatform API enabled 2026-09-23), billed to the $300 GCP credits. The AI Studio key returned 402 (paid prepay tier) and is unused.

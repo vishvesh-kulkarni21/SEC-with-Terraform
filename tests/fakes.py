@@ -21,3 +21,25 @@ class FakeEmbedder:
                 out[row, int(hashlib.md5(word.encode()).hexdigest(), 16) % self.dimensions] += 1
         norms = np.linalg.norm(out, axis=1, keepdims=True)
         return out / np.where(norms == 0, 1, norms)
+
+
+class ScriptedChatModel:
+    """Returns pre-written assistant turns in order, and records what it was sent."""
+
+    model_id = "scripted-model"
+
+    def __init__(self, turns):
+        from equity_research.llm.base import Message  # local: keep module import-light
+        self._Message = Message
+        self.turns = list(turns)  # each: str (final answer) or list of (tool_name, args)
+        self.calls = []
+
+    def generate(self, system, messages, tools, temperature=0.0):
+        from equity_research.llm.base import ChatResponse, ToolCall, Usage
+        self.calls.append({"system": system, "messages": list(messages), "tools": [t.name for t in tools]})
+        turn = self.turns.pop(0)
+        if isinstance(turn, str):
+            msg = self._Message("assistant", turn)
+        else:
+            msg = self._Message("assistant", "", [ToolCall(f"c{i}", n, a) for i, (n, a) in enumerate(turn)])
+        return ChatResponse(msg, Usage(100, 20), self.model_id)

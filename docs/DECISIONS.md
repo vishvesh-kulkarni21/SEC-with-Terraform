@@ -103,3 +103,32 @@ Each entry: what was chosen, what else was considered, and the one-line reason t
 - **Observed (k=3, 14 questions):** fixed 14/14, section 13/14, table 12/14. At k=5 it was 14, 14 and 13.
 - **Why the table chunker missed:** a pure number table embeds weakly. The Greater China table chunk was intact and captioned but ranked 4th, behind narrative text. Fixed and section windows mix a table with its surrounding explanation, which helps their similarity scores.
 - **Decision:** leave the chunkers as designed. 14 questions is too few to conclude anything, and changing a chunker because of these questions would be tuning on the test set. Phase 6 measures the effect on the agents' actual numeric error rate, which is the metric that matters. If it holds up, "table-preserving chunks retrieve *worse* under pure embedding search" is itself a finding.
+
+## Phase 4: One agent
+
+### D22. ReAct through native function calling, with our own loop running the tools
+- **Chose:** the model returns structured function calls. `run_agent` executes them, appends the results and loops until the model answers or hits the 12-step budget. Gemini's automatic function calling is turned off.
+- **Alternatives:** text ReAct (parsing "Thought/Action/Observation" lines), or letting the SDK run the tools automatically.
+- **Why:** native calls remove parsing errors. Running the loop ourselves means every call is traced, errors are caught, and a step budget stops runaway loops. `run_agent` is generic, so bull, bear and critic reuse it in Phase 5.
+
+### D23. The evidence ledger: every tool output gets an ID the agent must cite
+- **Chose:** facts are `F#`, calculations `C#`, passages `P#`. The agent writes "$391,035 million [F1]". Asking for the same fact twice returns the same ID.
+- **Why:** design rules 2 and 3. A citation resolves to an XBRL fact (tag, accession number, period) or a filing chunk, so the critic in Phase 5 checks claims mechanically instead of trusting the model.
+
+### D24. Python formats the numbers and the model copies the display string
+- **Chose:** tools return a raw `value` plus a `display` string ("$391,035 million", "26.92%"), and the prompt says to quote `display` verbatim.
+- **Why:** turning 391035000000 into "$391 billion", or 0.2692 into 26.92%, is arithmetic, and scale mistakes are an error class in the taxonomy. Python does the conversion once, correctly.
+
+### D25. Tool errors go back to the model, not up the stack
+- **Why:** "no revenue for FY2019; years available: 2024–2025" lets the agent recover or state the limitation. That's the self-correction behaviour ReAct is meant to show. A crash would lose the run.
+
+### D26. Tracing: a contextvar conversation ID, with JSON lines on stderr plus `runs/<id>.jsonl`
+- **Chose:** `with conversation():` binds an ID. `agent_start`, `llm_call` (tokens, latency), `tool_call` (args, result, latency) and `agent_end` all carry it. The fields `severity` and `message` follow Cloud Logging's structured-log format.
+- **Why:** one ID filters an entire run, locally or in Cloud Logging (Phase 7), with no tracing dependency. Per-call token counts feed the cost metric in Phase 6.
+
+### D27. Temperature 0 and a pinned model ID (`gemini-2.5-flash`)
+- **Why:** it reduces run-to-run variance, which matters for a controlled comparison. It doesn't remove it, so Phase 6 still repeats every configuration.
+
+### Open for Phase 6: the XBRL tools can bypass retrieval
+- **Issue:** if the agent gets every figure from `get_fact`, the chunking strategy can't affect numeric accuracy. The first live run already showed the agent quoting net income from a passage, so both paths are in use.
+- **Plan:** the chunker comparison uses questions whose answers live only in filing text (segment, product and geographic figures that aren't among the 16 XBRL metrics), plus a "text-only" mode where fact tools are disabled. The critic still checks against XBRL.
