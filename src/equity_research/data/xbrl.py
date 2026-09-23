@@ -36,7 +36,12 @@ METRICS: dict[str, MetricSpec] = {
     "pretax_income": MetricSpec("duration", "USD", (
         "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
     )),
-    "net_income": MetricSpec("duration", "USD", ("NetIncomeLoss",)),
+    # Fallbacks only apply when NetIncomeLoss is absent (ties within a filing go to the
+    # first tag); Caterpillar reports only the "available to common" variant.
+    "net_income": MetricSpec("duration", "USD", (
+        "NetIncomeLoss",
+        "NetIncomeLossAvailableToCommonStockholdersBasic",
+    )),
     "eps_diluted": MetricSpec("duration", "USD/shares", ("EarningsPerShareDiluted",)),
     "diluted_shares": MetricSpec("duration", "shares", ("WeightedAverageNumberOfDilutedSharesOutstanding",)),
     # Cash flow statement
@@ -48,7 +53,11 @@ METRICS: dict[str, MetricSpec] = {
     "current_assets": MetricSpec("instant", "USD", ("AssetsCurrent",)),
     "current_liabilities": MetricSpec("instant", "USD", ("LiabilitiesCurrent",)),
     "cash": MetricSpec("instant", "USD", ("CashAndCashEquivalentsAtCarryingValue",)),
-    "long_term_debt": MetricSpec("instant", "USD", ("LongTermDebt",)),  # includes current maturities
+    "long_term_debt": MetricSpec("instant", "USD", (  # includes current maturities where reported
+        "LongTermDebt",
+        "LongTermDebtAndCapitalLeaseObligationsIncludingCurrentMaturities",
+        "LongTermDebtNoncurrent",
+    )),
     "shareholders_equity": MetricSpec("instant", "USD", (
         "StockholdersEquity",
         "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest",
@@ -149,3 +158,20 @@ def _to_fact(metric: str, tag: str, unit: str, raw: dict, period_type: str) -> F
         form=raw["form"],
         filed=date.fromisoformat(raw["filed"]),
     )
+
+
+def reported_values(companyfacts: dict, metric: str, end: date) -> set[float]:
+    """Every value any 10-K ever reported for this metric and period end (all tags).
+
+    Used by the error taxonomy: an answer matching an older copy that differs from
+    ground truth is a "stale or restated" error, not a fabrication.
+    """
+    spec = METRICS[metric]
+    gaap = companyfacts.get("facts", {}).get("us-gaap", {})
+    values = set()
+    for tag in spec.tags:
+        for raw in gaap.get(tag, {}).get("units", {}).get(spec.unit, []):
+            fact = _to_fact(metric, tag, spec.unit, raw, spec.period_type)
+            if fact is not None and fact.end == end:
+                values.add(fact.value)
+    return values

@@ -1,0 +1,18 @@
+{
+  "_doc": "Frozen before any experiment (2026-09-23). A change means a new experiment, recorded in docs/DECISIONS.md.",
+  "question_metrics": ["revenue", "net_income", "operating_income", "operating_cash_flow", "total_assets", "shareholders_equity"],
+  "years_back": 2,
+  "top_k": 5,
+  "repeats": 3,
+  "temperature": 0.0,
+  "stage1": {"conditions": ["fixed", "section", "table", "xbrl_tools"], "model": "gemini-2.5-flash"},
+  "stage2": {"models": ["gemini-2.5-flash", "gemini-2.5-pro"]},
+  "grid": {"companies": ["AAPL", "JNJ", "WMT"], "models": ["gemini-2.5-flash", "gemini-2.5-pro"], "repeats": 2},
+  "debate": {"plant_kinds": ["perturb", "scale", "period"], "repeats": 1},
+  "tolerance": "match if within display rounding (half a unit of the last shown digit) or 0.5% relative, whichever is looser; a wrong fiscal year never matches",
+  "prices_usd_per_million_tokens": {
+    "_doc": "Vertex AI list prices used for the cost metric (standard tier, prompts under 200k tokens). VERIFY against cloud.google.com/vertex-ai/generative-ai/pricing before publishing; thinking tokens are billed as output.",
+    "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
+    "gemini-2.5-pro": {"input": 1.25, "output": 10.00}
+  }
+}

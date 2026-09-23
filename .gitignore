@@ -21,3 +21,6 @@ Thumbs.db
 
 # Agent run traces
 runs/
+
+# Eval traces are large; raw result rows and tables are committed
+eval/results/traces/

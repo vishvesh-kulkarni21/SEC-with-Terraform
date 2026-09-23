@@ -1,0 +1,13 @@
+{
+  "_doc": "Fixed company set, chosen 2026-09-23 BEFORE any experiment ran, so results cannot be cherry-picked. XOM was replaced by CVX before any run: the XOM ticker now maps to a new SEC registrant (CIK 2115436) with no 10-K history. Banks are excluded because their statements lack the metrics in scope (gross margin, current ratio); stated as a limitation.",
+  "companies": [
+    {"ticker": "AAPL", "sector": "Technology hardware", "fiscal_year_end": "late September"},
+    {"ticker": "MSFT", "sector": "Software", "fiscal_year_end": "June 30"},
+    {"ticker": "JNJ",  "sector": "Healthcare", "fiscal_year_end": "52/53 weeks, around Dec 31"},
+    {"ticker": "WMT",  "sector": "Retail", "fiscal_year_end": "January 31"},
+    {"ticker": "KO",   "sector": "Consumer staples", "fiscal_year_end": "December 31"},
+    {"ticker": "CAT",  "sector": "Industrials", "fiscal_year_end": "December 31"},
+    {"ticker": "CVX",  "sector": "Energy", "fiscal_year_end": "December 31"},
+    {"ticker": "NKE",  "sector": "Apparel", "fiscal_year_end": "May 31"}
+  ]
+}

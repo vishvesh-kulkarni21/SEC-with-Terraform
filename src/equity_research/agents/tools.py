@@ -64,29 +64,51 @@ TOOL_SPECS = [
                    "terminal_growth": {"type": "number", "description": "e.g. 0.025; must be below discount_rate"},
                    "years": {"type": "integer", "description": "Forecast years, default 5"}},
                   ["ticker", "fiscal_year", "growth_rate", "discount_rate", "terminal_growth"])),
+    ToolSpec("submit_answer",
+             "Submit your final answer to a factual question. Call exactly once, when done.",
+             _obj({"display": {"type": "string",
+                               "description": "The figure with its unit, e.g. '$416,161 million', or 'not found'"},
+                   "evidence_id": {"type": "string", "description": "The evidence id the figure came from, e.g. P3"},
+                   "fiscal_year": YEAR},
+                  ["display", "evidence_id", "fiscal_year"])),
     ToolSpec("search_filing",
-             "Semantic search over the company's latest 10-K text. Use for qualitative context "
-             "(strategy, risks, segment commentary), not as the source of reported figures.",
+             "Semantic search over the company's latest 10-K text (narrative and tables). "
+             "Returns the top passages, each with an evidence id.",
              _obj({"ticker": TICKER, "query": {"type": "string"}}, ["ticker", "query"])),
 ]
 
 
+TEXT_ONLY_TOOLS = {"search_filing", "submit_answer"}
+
+
 class ResearchTools:
+    """mode: "full" (XBRL tools, calculators, search) for research and debate;
+    "text" (search_filing only) for the retrieval evaluation, where figures must come
+    from the chunks the retriever returns; "qa" adds submit_answer to "full"."""
+
     def __init__(self, load_financials: Callable[[str], CompanyFinancials],
-                 retriever: Retriever | None, strategy: str, k: int = 5):
+                 retriever: Retriever | None, strategy: str, k: int = 5, mode: str = "full",
+                 financials_cache: dict[str, CompanyFinancials] | None = None):
         self._load = load_financials
-        self._financials: dict[str, CompanyFinancials] = {}
-        self.retriever, self.strategy, self.k = retriever, strategy, k
+        self._financials = financials_cache if financials_cache is not None else {}
+        self.retriever, self.strategy, self.k, self.mode = retriever, strategy, k, mode
         self.ledger = EvidenceLedger()
+        self.submitted: dict | None = None
+        self.retrieved: list[str] = []  # text of every passage returned, for retrieval precision
 
     @property
     def specs(self) -> list[ToolSpec]:
-        return TOOL_SPECS if self.retriever else [t for t in TOOL_SPECS if t.name != "search_filing"]
+        specs = TOOL_SPECS if self.retriever else [t for t in TOOL_SPECS if t.name != "search_filing"]
+        if self.mode == "text":
+            return [t for t in specs if t.name in TEXT_ONLY_TOOLS]
+        if self.mode == "full":
+            return [t for t in specs if t.name != "submit_answer"]
+        return specs
 
     def call(self, name: str, args: dict) -> dict:
         handler = getattr(self, f"_tool_{name}", None)
-        if handler is None:
-            return {"error": f"Unknown tool {name!r}"}
+        if handler is None or name not in {t.name for t in self.specs}:
+            return {"error": f"Tool {name!r} is not available"}
         try:
             return handler(**args)
         except (MissingMetricError, calc.CalculationError, LookupError, ValueError, TypeError) as e:
@@ -165,4 +187,10 @@ class ResearchTools:
         if self.retriever is None:
             raise ValueError("search_filing is disabled in this run")
         passages = self.retriever.search(ticker.upper(), query, self.strategy, k=self.k)
+        self.retrieved += [p.chunk.text for p in passages]
         return {"passages": [self.ledger.add_passage(p).for_model() for p in passages]}
+
+    def _tool_submit_answer(self, display, evidence_id, fiscal_year):
+        self.submitted = {"display": str(display), "evidence_id": str(evidence_id),
+                          "fiscal_year": int(fiscal_year)}
+        return {"status": "submitted"}

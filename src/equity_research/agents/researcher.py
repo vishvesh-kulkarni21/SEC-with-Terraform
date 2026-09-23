@@ -73,6 +73,10 @@ def run_agent(model: ChatModel, tools: ResearchTools, system: str, task: str,
                                    "error": result.get("error")})
             results.append(ToolResult(call.call_id, call.name, result))
         messages.append(Message("tool", tool_results=results))
+        if tools.submitted is not None:
+            run.answer = json.dumps(tools.submitted)
+            run.stopped_reason = "submitted"
+            break
     else:
         run.stopped_reason = "max_steps"
         run.answer = messages[-2].text if len(messages) > 1 and messages[-2].role == "assistant" else ""

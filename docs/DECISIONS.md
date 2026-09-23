@@ -163,3 +163,34 @@ Each entry: what was chosen, what else was considered, and the one-line reason t
 - **Second version:** it checked everything but was too strict. It rejected "a lower current ratio means less liquidity", and was shown only an 80-character passage preview (a bug).
 - **Final version:** explicit SUPPORTED/UNSUPPORTED rules. Definitional interpretations are allowed. Unstated causes, forecasts, valuation calls without a price, and comparisons missing a cited figure are rejected. The critic gets the full passage text and each calculation's formula.
 - **Why it matters:** critic strictness is a precision/recall trade-off. Too lax lets unsupported claims through, and too strict removes valid analysis. Phase 6 measures it.
+
+## Phase 6: Evaluation
+
+### D35. The chunker comparison runs the agent in text-only mode, with an XBRL-tools baseline
+- **Chose:** four conditions: `fixed`, `section` and `table` (the agent has only `search_filing` plus `submit_answer`), and `xbrl_tools` (the full toolset).
+- **Why:** with XBRL tools available, the agent never needs retrieval for a reported figure, so the chunker couldn't affect numeric accuracy (the open issue logged in Phase 4). Text-only mode forces figures to come from chunks, so the chunker is the only variable. The tools baseline answers the bigger design question: how much does grounding numbers in structured data beat reading them from text?
+
+### D36. Questions are generated from XBRL, so every one has ground truth
+- **Chose:** 6 metrics (revenue, net income, operating income, operating cash flow, total assets, equity) × the 2 latest fiscal years × 8 companies, giving **90 questions**. Metrics a company doesn't report are skipped.
+- **Why:** it's objective and needs no hand labelling. Everything can be answered from the latest 10-K (which shows 2 balance-sheet years and 3 income-statement years). The set was frozen in `eval/eval_config.json` before any run.
+
+### D37. Structured answer capture through a `submit_answer` tool
+- **Why:** the agent submits `{display, evidence_id, fiscal_year}` as a tool call. The answer is captured deterministically, with no second model call to extract it (which could add its own errors).
+
+### D38. Metrics, as computed
+- **Accuracy:** correct answers / runs. **Numeric error rate:** wrong / answered, since abstentions ("not found") are counted separately and aren't errors. It's reported with a Wilson 95% CI.
+- **Unsupported rate:** answered runs where the cited evidence doesn't contain the figure.
+- **Critic catch rate (natural errors):** the share of wrong answers the critic's deterministic layer would flag. **Critic catch rate (planted):** from the debate eval, by kind of planted error.
+- **Retrieval hit:** did *any* passage the agent retrieved contain the ground-truth figure as the filing prints it (e.g. "416,161")? This separates retrieval failures from reading failures.
+- **Latency:** p50 seconds per run. **Cost:** tokens × list price (in the config, to be verified), reported per run and **per correct answer**.
+
+### D39. The taxonomy is checked in a fixed order, most specific first
+- **Order:** scale, then stale/restated (matches an older reported copy of the same period), then wrong period, then wrong line item, then fabricated. "Not found" counts as an abstention.
+- **Why:** one wrong number can match several explanations, and a fixed order makes the classification deterministic and reproducible. Every class is unit tested with J&J's real restatement.
+
+### D40. Company set: 8 across sectors, with XOM swapped for CVX before any run
+- **Why:** the XOM ticker now maps to a new SEC registrant (CIK 2115436) with no 10-K history, and swapping before any experiment isn't cherry-picking. Two fallback tags were added before any run (CAT net income, KO debt), and each only applies when the main tag is absent. Banks are excluded because their statements don't fit the metric set.
+
+### D41. Repeats and parallelism
+- **Chose:** 3 repeats at temperature 0, 8 worker threads, resumable JSONL rows, and indexes built before threads start.
+- **Why:** temperature 0 still varies run to run, and repeats measure that variance. Building indexes first keeps embedding time out of latency and avoids races.

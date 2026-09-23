@@ -9,6 +9,7 @@ class CompanyFinancials:
     def __init__(self, ticker: str, companyfacts: dict):
         self.ticker = ticker.upper()
         self.name = companyfacts.get("entityName", self.ticker)
+        self.companyfacts = companyfacts
         self._facts: dict[str, dict[int, Fact]] = {}
 
         # Fiscal year ends come from revenue durations; balance sheet facts are
