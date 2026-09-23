@@ -72,5 +72,6 @@ class ChatModel(Protocol):
     model_id: str
 
     def generate(self, system: str, messages: list[Message], tools: list[ToolSpec],
-                 temperature: float = 0.0) -> ChatResponse:
+                 temperature: float = 0.0, json_schema: dict | None = None) -> ChatResponse:
+        """json_schema: if given (and no tools), the reply text is JSON matching it."""
         ...

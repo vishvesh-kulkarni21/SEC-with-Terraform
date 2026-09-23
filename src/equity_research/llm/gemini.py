@@ -67,8 +67,10 @@ class GeminiChat:
         self.model_id = model_id
 
     def generate(self, system: str, messages: list[Message], tools: list[ToolSpec],
-                 temperature: float = 0.0) -> ChatResponse:
+                 temperature: float = 0.0, json_schema: dict | None = None) -> ChatResponse:
         config = types.GenerateContentConfig(
+            response_mime_type="application/json" if json_schema else None,
+            response_json_schema=json_schema,
             system_instruction=system,
             temperature=temperature,
             tools=[types.Tool(function_declarations=[

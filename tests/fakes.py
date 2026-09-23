@@ -1,6 +1,7 @@
 """Deterministic stand-ins for model providers, so tests need no API key or network."""
 
 import hashlib
+import json
 import re
 
 import numpy as np
@@ -34,10 +35,15 @@ class ScriptedChatModel:
         self.turns = list(turns)  # each: str (final answer) or list of (tool_name, args)
         self.calls = []
 
-    def generate(self, system, messages, tools, temperature=0.0):
+    def generate(self, system, messages, tools, temperature=0.0, json_schema=None):
         from equity_research.llm.base import ChatResponse, ToolCall, Usage
-        self.calls.append({"system": system, "messages": list(messages), "tools": [t.name for t in tools]})
+        self.calls.append({"system": system, "messages": list(messages), "tools": [t.name for t in tools],
+                           "json_schema": json_schema})
         turn = self.turns.pop(0)
+        if callable(turn):  # computes the reply from what the model was sent
+            turn = turn(system, messages)
+        if isinstance(turn, dict):
+            turn = json.dumps(turn)
         if isinstance(turn, str):
             msg = self._Message("assistant", turn)
         else:

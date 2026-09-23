@@ -132,3 +132,34 @@ Each entry: what was chosen, what else was considered, and the one-line reason t
 ### Open for Phase 6: the XBRL tools can bypass retrieval
 - **Issue:** if the agent gets every figure from `get_fact`, the chunking strategy can't affect numeric accuracy. The first live run already showed the agent quoting net income from a passage, so both paths are in use.
 - **Plan:** the chunker comparison uses questions whose answers live only in filing text (segment, product and geographic figures that aren't among the 16 XBRL metrics), plus a "text-only" mode where fact tools are disabled. The critic still checks against XBRL.
+
+## Phase 5: Multi-agent
+
+### D28. Bull and bear get no tools, only the researcher's evidence
+- **Why:** the spec says they argue "using only what the researcher gathered". Without tools they can't fetch or invent new numbers, so every figure they use already has a ledger ID the critic can check. They return **structured claims** (JSON schema): the text, plus `figures[]` (each display string with its evidence ID) and `evidence_ids[]` for passages.
+
+### D29. The critic has two layers: Python for numbers, the LLM for support
+- **Deterministic (Python):** each figure is checked against the cited fact or calculation value, or must literally appear in the cited passage. Also checked: numbers in the text that aren't declared as figures, evidence IDs that don't exist, a fiscal year in the text that doesn't match the evidence's year, and stale periods.
+- **LLM:** does the cited evidence support what the claim *concludes* (causes, risks, judgments)? The LLM is told to take numbers as given.
+- **Why:** checking a number against ground truth is arithmetic (design rule 1) and must never depend on a model's judgment. Support for qualitative claims genuinely needs language understanding. Splitting them also shows *which* layer caught each error, which Phase 6 reports.
+
+### D30. Tolerance = display rounding or 0.5% relative, whichever is looser
+- **Why:** "26.9%" for 0.26916 is a correct rounding and must pass. "$416,161 billion" must fail. A correct number attributed to the wrong fiscal year fails too (`wrong_period`), as CLAUDE.md requires.
+
+### D31. Block, then revise, then remove
+- **Chose:** failed claims go back to the author with the critic's reasons, for up to 2 revision rounds. Anything still failing is removed and counted in the report ("N claims removed by the critic"). A missing LLM verdict counts as a failure, never a pass.
+- **Why:** design rule 3, unverified claims never pass silently. Revision gives the author a chance to fix honest mistakes. Removal guarantees the output contains only verified claims.
+
+### D32. Planted errors: perturb (+7%), scale (million↔billion, or ÷10), period (shift the year)
+- **Why:** each kind maps to a taxonomy class (fabricated or wrong value, wrong scale, wrong period). Without planted errors, a high pass rate could just mean the critic passes everything. Live result: 6 of 6 caught across AAPL and MSFT, one plant per side for each kind.
+
+### D33. Found in a live run: the model's sense of "now" overrode the tool
+- **Observed:** `list_metrics` returned `latest_fiscal_year: 2026` for MSFT, and the researcher still analysed FY2022–2023. The critic passed the output because every number was correct *for those years*.
+- **Fix, in code rather than prompts:** the orchestrator reads the latest fiscal year from the data and pins "FY2026 vs FY2025" in the task. The critic gets an `allowed_years` set, and figures outside it fail as `stale_period`.
+- **Lesson for the write-up:** a stale period is invisible to value-level checking. It has to be enforced as a policy.
+
+### D34. Calibrating the critic's LLM layer (two iterations)
+- **First version:** it only checked claims that cited passages, so "the DCF shows the stock is attractive" (with no price available) slipped through.
+- **Second version:** it checked everything but was too strict. It rejected "a lower current ratio means less liquidity", and was shown only an 80-character passage preview (a bug).
+- **Final version:** explicit SUPPORTED/UNSUPPORTED rules. Definitional interpretations are allowed. Unstated causes, forecasts, valuation calls without a price, and comparisons missing a cited figure are rejected. The critic gets the full passage text and each calculation's formula.
+- **Why it matters:** critic strictness is a precision/recall trade-off. Too lax lets unsupported claims through, and too strict removes valid analysis. Phase 6 measures it.
