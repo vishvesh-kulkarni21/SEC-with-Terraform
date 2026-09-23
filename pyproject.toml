@@ -1,0 +1,24 @@
+[project]
+name = "equity-research-agent"
+version = "0.1.0"
+description = "Multi-agent equity research from SEC filings, with every number verified against XBRL."
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.32",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

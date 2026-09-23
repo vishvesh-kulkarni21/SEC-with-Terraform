@@ -1,0 +1,20 @@
+# Secrets
+.env
+
+# EDGAR response cache (re-fetchable, can be large)
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+build/
+dist/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
