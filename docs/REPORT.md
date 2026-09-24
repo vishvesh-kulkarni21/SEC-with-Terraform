@@ -95,6 +95,7 @@ Of 283 draft claims, **40% failed first review**, 31% of them for claims the cit
 - **One embedding model and a fixed top-k (5).** Hybrid (keyword + vector) search or reranking could change the table-chunker result, and adding context to table chunks is the obvious next experiment.
 - **Question scope.** The questions are headline figures that exist in XBRL. Segment and product figures, which exist only in text, weren't scored numerically.
 - **Company set.** 8 large US companies with no banks (their statements don't fit the metric set). The interaction result is exploratory.
+- **The critic changed after the evaluation.** Live runs found two passage-check false positives and a critic that did its own arithmetic (DECISIONS D49, D50). The fixes don't affect numeric error rates (scored against XBRL). The unsupported-claim rate and the natural-error catch rate come from the earlier critic and weren't recomputed.
 - **Cost uses list prices** from the config and should be checked against current Vertex AI pricing.
 
 ## Reproduce
