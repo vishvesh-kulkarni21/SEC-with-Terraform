@@ -250,3 +250,19 @@ Each entry: what was chosen, what else was considered, and the one-line reason t
 - **Cause 2:** filing tables print "%" only on the first row of a column ("25.8% | ... | 22.1 | 17.7"), and the check required "22.1%".
 - **Fix:** keep word boundaries, and let a percent figure match the bare number. The boundary rules still stop "380" from matching inside "25,380". Regression tests use the real JNJ text.
 - **Effect on Phase 6:** numeric error rates don't change, because they're scored against XBRL (`scoring.classify`). Two reported metrics did use this check (`runner.py` sets `critic_issues`): the unsupported-claim rate, and the critic's catch rate on natural errors. Both came from the old, stricter check. Under the new one, the unsupported rate can only go down. The natural catch rate may also go down, because a wrong-row number can now match a bare table cell. Those metrics weren't recomputed. The report's point that natural catch rates are low only gets stronger.
+
+### D50. The critic's own reasons are checked for arithmetic
+- **Observed (JNJ live run):** to judge "net income more than doubled", the LLM critic wrote "$14,066 million × 2 = $28,132 million". That breaks design rule 1 inside the component meant to enforce it.
+- **Chose:** a deterministic guard on the critic. Any number in the critic's reason that appears in neither the claim nor its cited evidence was computed by the model. That verdict is discarded and the claim fails closed with `critic_arithmetic`. The author is told to cite a calculation for the magnitude, or to drop the wording.
+- **Also:**
+  - The critic prompt now says "never calculate". It says magnitude words ("doubled") need a cited calculation, and that a claim reporting only cited figures and their direction needs no passage. The JNJ critic had rejected those with "no passages were provided".
+  - The side prompt now asks authors to avoid intensifiers ("robust", "significant"), because the critic rejects them and each rejection costs a revision round.
+- **Alternatives:**
+  - Prompt only: models don't reliably follow "never calculate", which is the lesson of D47.
+  - Trust the verdict when it happens to be right: its result can't be verified, so it would break rule 3.
+- **Refined after a live run:** the guard flagged "already below 100%" in a current-ratio verdict. That's a convention, not a computation, so 0, 1 and 100 are allowed as reference points.
+- **Why fail closed:** an unverifiable verdict must never let a claim pass silently (rule 3), and the fix costs at most one revision round.
+
+### D51. CI runs the offline suite and validates the Terraform
+- **Chose:** a GitHub Actions workflow runs `pytest -m "not integration"` with no credentials, because fakes stand in for the model. It also runs `terraform fmt -check` and `terraform validate` (`-backend=false`).
+- **Why:** integration tests hit live EDGAR and would need a User-Agent secret and network access in CI. They run locally against the cache instead. Validating the Terraform catches broken infrastructure without GCP credentials.

@@ -137,6 +137,37 @@ def test_llm_layer_rejects_unsupported_and_missing_verdicts(ledger):
     assert verdicts[1].issues[0].code == "unsupported"
 
 
+def test_critic_verdict_that_relies_on_its_own_arithmetic_fails_closed(ledger):
+    # Real JNJ case: the critic multiplied a figure to judge "more than doubling".
+    from equity_research.agents.critic import Critic
+    from tests.fakes import ScriptedChatModel
+
+    ledger.add_fact("AAPL", fact("net_income", 2024, 14_066e6))                             # F2
+    ledger.add_fact("AAPL", fact("net_income", 2025, 26_804e6))                             # F3
+    claims = [
+        Claim("Net income more than doubled to $26,804 million from $14,066 million.",
+              [Figure("$26,804 million", "F3"), Figure("$14,066 million", "F2")]),
+        Claim("Net income rose to $26,804 million from $14,066 million.",
+              [Figure("$26,804 million", "F3"), Figure("$14,066 million", "F2")]),
+        Claim("Services grew 14% due to advertising.", [Figure("14%", "P1")], ["P1"]),
+    ]
+    critic = Critic(ScriptedChatModel([{"verdicts": [
+        {"index": 0, "supported": False, "reason": "$14,066 million * 2 = $28,132 million, more than $26,804 million"},
+        {"index": 1, "supported": True, "reason": "direction from $14,066 million to $26,804 million is stated"},
+        {"index": 2, "supported": True, "reason": "P1 says services grew 14% due to advertising; "
+                                                   "a ratio below 100% is a standard threshold, not a calculation"},
+    ]}]))
+    verdicts = critic.review(claims, ledger, "bull")
+    assert [i.code for i in verdicts[0].issues] == ["critic_arithmetic"]
+    assert "28,132" in verdicts[0].issues[0].detail
+    assert verdicts[1].passed and verdicts[2].passed  # numbers quoted from the claim or passage are fine
+
+
+def test_critic_prompt_forbids_arithmetic():
+    from equity_research.agents.critic import SUPPORT_PROMPT
+    assert "Never calculate" in SUPPORT_PROMPT and "needs no passage" in SUPPORT_PROMPT
+
+
 def test_stale_period_fails_when_years_are_pinned(ledger):
     ledger.add_fact("AAPL", fact("revenue", 2022, 394_328e6))  # F2
     c = Claim("Revenue was $394,328 million in fiscal 2022.", [Figure("$394,328 million", "F2")])

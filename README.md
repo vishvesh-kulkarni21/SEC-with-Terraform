@@ -1,5 +1,7 @@
 # Agentic Equity Research
 
+[![tests](https://github.com/vishvesh-kulkarni21/SEC-with-Terraform/actions/workflows/tests.yml/badge.svg)](https://github.com/vishvesh-kulkarni21/SEC-with-Terraform/actions/workflows/tests.yml) ![Python 3.12](https://img.shields.io/badge/python-3.12-blue) ![GCP Cloud Run](https://img.shields.io/badge/deploy-Cloud%20Run%20%2B%20Terraform-4285F4) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 A multi-agent system that researches a public company from its SEC filings and produces a **bull case and a bear case in which every number is verified against the company's filed XBRL data** before the output is accepted. The critic can block claims.
 
 The project exists to answer one question with measurements:
@@ -7,6 +9,14 @@ The project exists to answer one question with measurements:
 > **How often do financial research agents get numbers wrong, and which retrieval strategy reduces it?**
 
 The findings are in [`docs/REPORT.md`](docs/REPORT.md). Every design decision and its reasoning is in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+
+## Sample output
+
+Every run produces a PDF report: both cases with an evidence id on every figure, the critic's log, and a Sources table that resolves each id to its XBRL tag, filing accession and period, or to the 10-K passage. Sample reports from live runs are in [`docs/sample_reports/`](docs/sample_reports/). The [AAPL report](docs/sample_reports/AAPL_acb9f61ec691494a.pdf) was run with planted wrong numbers.
+
+| The verified cases | The critic catching planted errors |
+|---|---|
+| ![Report page 1](docs/images/report_page1.png) | ![Critic log](docs/images/report_critic.png) |
 
 ## Architecture
 
@@ -60,7 +70,7 @@ The full tables, the error taxonomy, the model comparison and the critic catch r
 ```bash
 python -m venv .venv && .venv/Scripts/pip install -e ".[dev]"   # Windows; use .venv/bin on macOS/Linux
 cp .env.example .env        # set SEC_USER_AGENT; VERTEX_PROJECT (gcloud ADC) or GEMINI_API_KEY
-pytest                      # 99 tests, no network needed except the integration tests (cached)
+pytest                      # 101 tests, no network needed except the integration tests (cached)
 
 python -m equity_research.agents.research_cli AAPL "How did Apple's net margin change in fiscal 2025?"
 python -m equity_research.agents.debate_cli MSFT --plant scale      # plant a wrong number; watch the critic

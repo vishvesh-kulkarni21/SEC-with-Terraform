@@ -181,7 +181,8 @@ def run_debate_case(ctx: EvalContext, ticker: str, plant_kind: str, strategy: st
             "caught_by_code": planted_codes,
             "draft_claims": len(first),
             "draft_failed": sum(not v.passed for v in first),
-            "draft_unsupported": sum(any(i.code == "unsupported" for i in v.issues) for v in first),
+            "draft_unsupported": sum(any(i.code in ("unsupported", "critic_arithmetic") for i in v.issues)
+                                     for v in first),
             "rounds": len(r.rounds), "kept": len(r.claims), "removed": len(r.removed),
         }
     return {"kind": "debate", "ticker": ticker, "plant_kind": plant_kind, "condition": strategy,

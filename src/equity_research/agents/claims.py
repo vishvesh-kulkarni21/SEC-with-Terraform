@@ -71,7 +71,7 @@ class Claim:
 
 @dataclass
 class Issue:
-    code: str  # no_evidence, value_mismatch, wrong_period, stale_period, not_in_passage, undeclared_number, unparseable, unsupported
+    code: str  # no_evidence, value_mismatch, wrong_period, stale_period, not_in_passage, undeclared_number, unparseable, unsupported, critic_arithmetic
     detail: str
 
 

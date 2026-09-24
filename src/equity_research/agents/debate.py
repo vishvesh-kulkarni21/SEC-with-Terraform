@@ -37,7 +37,7 @@ Argue the {stance} case in 4 to 6 claims, using ONLY the evidence provided. You 
 Rules:
 - Each claim is one sentence.
 - Copy every number exactly as its evidence "display" shows it (no quotation marks), and list it in "figures" with its evidence_id.
-- Only draw conclusions the evidence supports. There is no market price, so do not call the stock cheap or expensive; a DCF value can be reported, not judged against a price.
+- Only draw conclusions the evidence supports. Do not use intensifiers (robust, significant, impressive, strong, surged) unless a cited passage uses them; the critic rejects them. Do not claim a magnitude such as "doubled" unless a figure states it. There is no market price, so do not call the stock cheap or expensive; a DCF value can be reported, not judged against a price.
 - Every number in the text must appear in "figures". Do not compute, round, or rescale numbers.
 - Qualitative statements must cite the supporting passage ids in "evidence_ids".
 - State fiscal years explicitly (e.g. "in fiscal 2025"). Only use figures from the two fiscal years in the brief.

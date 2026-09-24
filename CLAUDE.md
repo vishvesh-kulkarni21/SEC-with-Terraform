@@ -235,7 +235,7 @@ Update this as phases complete, so a new session knows where we are.
 - [x] Phase 8: Write-up (2026-09-23; `docs/REPORT.md`)
 
 **Current phase:** Build complete. Next: interview prep (walk through docs/DECISIONS.md and the code with explain-back questions).
-**Last decision made:** (2026-09-23) See docs/DECISIONS.md, the running log (D1–D47 cover Phases 1–7; D48–D49 PDF reports and a critic passage-check fix).
+**Last decision made:** (2026-09-23) See docs/DECISIONS.md, the running log (D1–D47 cover Phases 1–7; D48–D51 PDF reports, critic fixes, CI).
 **Open questions:**
 - `agent-infra` = `infra/` in this repo (Terraform, local state, gitignored tfvars). Redeploy: Cloud Build with the build SA (see README), then `terraform apply -var image_tag=<sha>`.
 - Gemini is accessed through Vertex AI (VERTEX_PROJECT in .env; aiplatform API enabled 2026-09-23), billed to the $300 GCP credits. The AI Studio key returned 402 (paid prepay tier) and is unused.
