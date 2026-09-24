@@ -242,7 +242,7 @@ Each entry: what was chosen, what else was considered, and the one-line reason t
 - **Chose:** `debate_cli` writes `runs/<TICKER>_<conversation_id>.pdf` (reportlab) instead of a markdown file. The PDF has the run's metadata, both cases with evidence ids, the full critic log (every rejected claim with its reason, and planted errors marked CAUGHT/MISSED), and a Sources table that resolves every cited id to its XBRL tag, accession number and period, or to a passage excerpt.
 - **Alternatives:** markdown to HTML to PDF (needs a markdown parser plus a browser engine, e.g. WeasyPrint with native libraries on Windows), or fpdf2 (lighter, but weaker at tables that wrap and span pages).
 - **Why:** reportlab is pure Python, and its flowable tables span pages cleanly. The renderer only lays out numbers the pipeline already produced and formats no new ones (rule 1).
-- **Also:** the CLI's default chunker changed from `table` to `fixed`, the lowest-error chunker in Phase 6 (D43). The API default is unchanged until the next deploy.
+- **Also:** the CLI's default chunker changed from `table` to `fixed`, the lowest-error chunker in Phase 6 (D43). The API now matches: its default is also `fixed`, and `POST /debate` with `"format": "pdf"` returns the same PDF (with the conversation id in an `X-Conversation-Id` header).
 
 ### D49. Found in live test runs: the passage check rejected numbers that were really there
 - **Observed (JNJ):** the critic removed claims citing "$14.7 billion" and "22.1%", and both appear in the cited 10-K passages.

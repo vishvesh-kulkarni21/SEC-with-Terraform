@@ -1,8 +1,8 @@
 """HTTP API for Cloud Run.
 
   GET  /health
-  POST /research  {"ticker": "AAPL", "question": "...", "strategy": "table"}
-  POST /debate    {"ticker": "AAPL", "strategy": "table", "plant": null}
+  POST /research  {"ticker": "AAPL", "question": "...", "strategy": "fixed"}
+  POST /debate    {"ticker": "AAPL", "strategy": "fixed", "plant": null, "format": "json" | "pdf"}
 
 Every response carries the run's conversation_id; every log line of the run carries it
 too (plus Cloud Logging's trace field), so one request can be followed end to end:
@@ -11,13 +11,15 @@ too (plus Cloud Logging's trace field), so one request can be followed end to en
 
 import os
 import re
+import tempfile
 from functools import lru_cache
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from equity_research.agents.debate import render_markdown, run_debate
+from equity_research.agents.pdf_report import render_pdf
 from equity_research.agents.planting import PLANT_KINDS
 from equity_research.agents.research_cli import build_tools
 from equity_research.agents.researcher import research
@@ -36,13 +38,14 @@ TICKER_RE = r"^[A-Za-z.\-]{1,10}$"
 class ResearchRequest(BaseModel):
     ticker: str = Field(pattern=TICKER_RE, examples=["AAPL"])
     question: str = Field(min_length=5, max_length=500)
-    strategy: Strategy = "table"
+    strategy: Strategy = "fixed"  # lowest numeric error rate in the evaluation (D43)
 
 
 class DebateRequest(BaseModel):
     ticker: str = Field(pattern=TICKER_RE, examples=["AAPL"])
-    strategy: Strategy = "table"
+    strategy: Strategy = "fixed"
     plant: Literal[PLANT_KINDS] | None = Field(None, description="Inject a wrong number to demo the critic")
+    format: Literal["json", "pdf"] = Field("json", description="pdf returns the verified report as a PDF file")
 
 
 @lru_cache(maxsize=1)
@@ -91,10 +94,18 @@ def debate_endpoint(body: DebateRequest, request: Request):
     with conversation(extra=_trace_fields(request)) as cid:
         log_event("request", endpoint="/debate", ticker=body.ticker, strategy=body.strategy, plant=body.plant)
         try:
-            report = run_debate(body.ticker, build_tools(settings, body.strategy), model, model, model,
-                                plant_kind=body.plant)
+            tools = build_tools(settings, body.strategy)
+            latest = tools.fin(body.ticker.upper()).latest_year
+            report = run_debate(body.ticker, tools, model, model, model, plant_kind=body.plant)
         except UnknownTickerError as e:
             raise HTTPException(404, str(e))
+    if body.format == "pdf":
+        with tempfile.TemporaryDirectory() as tmp:
+            path = render_pdf(report, tmp + "/report.pdf", body.strategy, model.model_id, (latest - 1, latest))
+            content = path.read_bytes()
+        return Response(content, media_type="application/pdf", headers={
+            "Content-Disposition": f'attachment; filename="{report.ticker}_{cid}.pdf"',
+            "X-Conversation-Id": cid})
     return {
         "conversation_id": cid, "report_markdown": render_markdown(report), "seconds": report.seconds,
         "tokens": {"input": report.usage.input_tokens, "output": report.usage.output_tokens},
